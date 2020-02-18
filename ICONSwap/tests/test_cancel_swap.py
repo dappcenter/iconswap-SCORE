@@ -33,8 +33,6 @@ class TestICONSwap(IconIntegrateTestBase):
     TEST_HTTP_ENDPOINT_URI_V3 = "http://127.0.0.1:9000/api/v3"
     SCORE_PROJECT = os.path.abspath(os.path.join(DIR_PATH, '..'))
 
-    _PARTICIPATION_COST = 1 * 10**18
-
     def setUp(self):
         super().setUp()
 
@@ -80,7 +78,19 @@ class TestICONSwap(IconIntegrateTestBase):
 
         return result
 
+    def _add_whitelist(self, contract):
+        # OK
+        result = transaction_call_success(
+            super(),
+            from_=self._operator,
+            to_=self._score_address,
+            method="add_whitelist",
+            params={'contract': contract},
+            icon_service=self.icon_service
+        )
+
     def _create_swap_icx(self):
+        self._add_whitelist('cx0000000000000000000000000000000000000000')
         # OK
         result = transaction_call_success(
             super(),

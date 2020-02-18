@@ -33,8 +33,6 @@ class TestICONSwap(IconIntegrateTestBase):
     TEST_HTTP_ENDPOINT_URI_V3 = "http://127.0.0.1:9000/api/v3"
     SCORE_PROJECT = os.path.abspath(os.path.join(DIR_PATH, '..'))
 
-    _PARTICIPATION_COST = 1 * 10**18
-
     def setUp(self):
         super().setUp()
 

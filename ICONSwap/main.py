@@ -121,6 +121,7 @@ class ICONSwap(IconScoreBase):
     def _check_contract(self, address: Address) -> None:
         if not address.is_contract:
             raise InvalidOrderContract
+        Whitelist(self.db).check_exists(address)
 
     # ================================================
     #  External methods

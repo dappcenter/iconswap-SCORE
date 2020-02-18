@@ -33,8 +33,6 @@ class TestICONSwap(IconIntegrateTestBase):
     TEST_HTTP_ENDPOINT_URI_V3 = "http://127.0.0.1:9000/api/v3"
     SCORE_PROJECT = os.path.abspath(os.path.join(DIR_PATH, '..'))
 
-    _PARTICIPATION_COST = 1 * 10**18
-
     def setUp(self):
         super().setUp()
 
@@ -45,6 +43,8 @@ class TestICONSwap(IconIntegrateTestBase):
         # install SCORE
         self._score_address = self._deploy_score()['scoreAddress']
         self._operator = self._test1
+        self._user = self._wallet_array[0]
+        self._attacker = self._wallet_array[1]
 
         for wallet in self._wallet_array:
             icx_transfer_call(
@@ -76,102 +76,70 @@ class TestICONSwap(IconIntegrateTestBase):
         return result
 
     # ===============================================================
-    def test_create_swap_ok(self):
+    def test_add_whitelist_ok(self):
         # OK
         result = transaction_call_success(
             super(),
             from_=self._operator,
             to_=self._score_address,
-            method="create_swap",
-            params={
-                'contract1': 'cx0000000000000000000000000000000000000000',
-                'amount1': 100,
-                'contract2': 'cx0000000000000000000000000000000000000000',
-                'amount2': 200
-            },
+            method="add_whitelist",
+            params={'contract': 'cx0000000000000000000000000000000000000000'},
             icon_service=self.icon_service
         )
 
-    def test_create_swap_zero_amount(self):
-        # Amount cannot be zero
+        whitelist = icx_call(
+            super(),
+            from_=self._operator.get_address(),
+            to_=self._score_address,
+            method="get_whitelist",
+            icon_service=self.icon_service
+        )
+
+        self.assertTrue(len(whitelist) == 1)
+        self.assertTrue(whitelist[0] == Address.from_string('cx0000000000000000000000000000000000000000'))
+
+    def test_add_whitelist_double_add(self):
+        # OK
+        result = transaction_call_success(
+            super(),
+            from_=self._operator,
+            to_=self._score_address,
+            method="add_whitelist",
+            params={'contract': 'cx0000000000000000000000000000000000000000'},
+            icon_service=self.icon_service
+        )
+        # Already added
         result = transaction_call_error(
             super(),
             from_=self._operator,
             to_=self._score_address,
-            method="create_swap",
-            params={
-                'contract1': 'cx0000000000000000000000000000000000000000',
-                'amount1': 0,
-                'contract2': 'cx0000000000000000000000000000000000000000',
-                'amount2': 200
-            },
+            method="add_whitelist",
+            params={'contract': 'cx0000000000000000000000000000000000000000'},
             icon_service=self.icon_service
         )
+        self.assertEqual(result['failure']['message'], "ItemAlreadyExists('WHITELIST_COMPOSITE', 'cx0000000000000000000000000000000000000000')")
 
-        self.assertEqual(result['failure']['message'], 'InvalidOrderAmount()')
-
-        # Amount cannot be zero
+    def test_add_whitelist_not_contract(self):
+        # OK
         result = transaction_call_error(
             super(),
             from_=self._operator,
             to_=self._score_address,
-            method="create_swap",
-            params={
-                'contract1': 'cx0000000000000000000000000000000000000000',
-                'amount1': 100,
-                'contract2': 'cx0000000000000000000000000000000000000000',
-                'amount2': 0
-            },
+            method="add_whitelist",
+            params={'contract': 'hx0000000000000000000000000000000000000000'},
             icon_service=self.icon_service
         )
+        self.assertEqual(result['failure']['message'], 'InvalidWhitelistContract()')
 
-        self.assertEqual(result['failure']['message'], 'InvalidOrderAmount()')
 
-    def test_create_swap_badaddr(self):
-        # Contract must be a contract
+    def test_add_whitelist_not_operator(self):
+        # OK
         result = transaction_call_error(
             super(),
-            from_=self._operator,
+            from_=self._attacker,
             to_=self._score_address,
-            method="create_swap",
-            params={
-                'contract1': 'hx0000000000000000000000000000000000000000',
-                'amount1': 100,
-                'contract2': 'cx0000000000000000000000000000000000000000',
-                'amount2': 200
-            },
+            method="add_whitelist",
+            params={'contract': 'cx0000000000000000000000000000000000000000'},
             icon_service=self.icon_service
         )
-        self.assertEqual(result['failure']['message'], 'InvalidOrderContract()')
-
-        # Contract must be a contract
-        result = transaction_call_error(
-            super(),
-            from_=self._operator,
-            to_=self._score_address,
-            method="create_swap",
-            params={
-                'contract1': 'hx0000000000000000000000000000000000000000',
-                'amount1': 100,
-                'contract2': 'hx0000000000000000000000000000000000000000',
-                'amount2': 200
-            },
-            icon_service=self.icon_service
-        )
-        self.assertEqual(result['failure']['message'], 'InvalidOrderContract()')
-
-        # Contract must be a contract
-        result = transaction_call_error(
-            super(),
-            from_=self._operator,
-            to_=self._score_address,
-            method="create_swap",
-            params={
-                'contract1': '123',
-                'amount1': 100,
-                'contract2': 'cx0000000000000000000000000000000000000000',
-                'amount2': 200
-            },
-            icon_service=self.icon_service
-        )
-        self.assertEqual(result['failure']['message'], 'Invalid address')
+        self.assertEqual(result['failure']['message'], 'SenderNotScoreOwnerError()')

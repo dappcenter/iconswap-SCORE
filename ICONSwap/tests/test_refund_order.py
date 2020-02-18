@@ -33,8 +33,6 @@ class TestICONSwap(IconIntegrateTestBase):
     TEST_HTTP_ENDPOINT_URI_V3 = "http://127.0.0.1:9000/api/v3"
     SCORE_PROJECT = os.path.abspath(os.path.join(DIR_PATH, '..'))
 
-    _PARTICIPATION_COST = 1 * 10**18
-
     def setUp(self):
         super().setUp()
 
@@ -50,6 +48,9 @@ class TestICONSwap(IconIntegrateTestBase):
         for wallet in self._wallet_array:
             icx_transfer_call(
                 super(), self._test1, wallet.get_address(), 100 * 10**18, self.icon_service)
+
+        self._operator_balance = get_icx_balance(super(), address=self._operator.get_address(), icon_service=self.icon_service)
+        self._user_balance = get_icx_balance(super(), address=self._user.get_address(), icon_service=self.icon_service)
 
     def _deploy_score(self, to: str = SCORE_INSTALL_ADDRESS) -> dict:
         # Generates an instance of transaction for deploying SCORE.
@@ -76,7 +77,19 @@ class TestICONSwap(IconIntegrateTestBase):
 
         return result
 
+    def _add_whitelist(self, contract):
+        # OK
+        result = transaction_call_success(
+            super(),
+            from_=self._operator,
+            to_=self._score_address,
+            method="add_whitelist",
+            params={'contract': contract},
+            icon_service=self.icon_service
+        )
+
     def _create_swap_icx(self):
+        self._add_whitelist('cx0000000000000000000000000000000000000000')
         # OK
         result = transaction_call_success(
             super(),
@@ -98,17 +111,6 @@ class TestICONSwap(IconIntegrateTestBase):
         o1id, o2id = map(lambda x: int(x, 16), result['eventLogs'][0]['data'])
         return swapid, o1id, o2id
 
-    def _cancel_swap(self, swapid: int):
-        # OK
-        result = transaction_call_success(
-            super(),
-            from_=self._operator,
-            to_=self._score_address,
-            method="cancel_swap",
-            params={'swapid': swapid},
-            icon_service=self.icon_service
-        )
-
     def _fulfill_icx_order(self, _from, orderid, amount):
         result = transaction_call_success(
             super(),
@@ -119,149 +121,128 @@ class TestICONSwap(IconIntegrateTestBase):
             value=amount,
             icon_service=self.icon_service
         )
-
-    def _refund_order(self, _from, orderid):
+    
+    def _do_swap(self, swapid):
         result = transaction_call_success(
             super(),
-            from_=_from,
+            from_=self._operator,
             to_=self._score_address,
-            method="refund_order",
-            params={'orderid': orderid},
+            method="do_swap",
+            params={'swapid': swapid},
+            icon_service=self.icon_service
+        )
+
+    def _cancel_swap(self, swapid):
+        # OK
+        result = transaction_call_success(
+            super(),
+            from_=self._operator,
+            to_=self._score_address,
+            method="cancel_swap",
+            params={"swapid": swapid},
             icon_service=self.icon_service
         )
 
     # ===============================================================
-    def test_fulfill_icx_order_ok(self):
-        swapid, o1id, o2id = self._create_swap_icx()
-
-        # OK
-        result = transaction_call_success(
-            super(),
-            from_=self._operator,
-            to_=self._score_address,
-            method="fulfill_icx_order",
-            params={'orderid': o1id},
-            value=100,
-            icon_service=self.icon_service
-        )
-
-    def test_fulfill_icx_order_refunded_order_ok(self):
+    def test_refund_order_ok(self):
         swapid, o1id, o2id = self._create_swap_icx()
         self._fulfill_icx_order(self._operator, o1id, 100)
         self._fulfill_icx_order(self._user, o2id, 200)
-        self._refund_order(self._operator, o1id)
 
-        # OK
         result = transaction_call_success(
             super(),
             from_=self._operator,
             to_=self._score_address,
-            method="fulfill_icx_order",
-            params={'orderid': o1id},
-            value=100,
-            icon_service=self.icon_service
-        )
-
-    def test_fulfill_icx_order_wrong_amount(self):
-        swapid, o1id, o2id = self._create_swap_icx()
-
-        # Wrong ICX amount
-        result = transaction_call_error(
-            super(),
-            from_=self._operator,
-            to_=self._score_address,
-            method="fulfill_icx_order",
-            params={'orderid': o1id},
-            value=123,
-            icon_service=self.icon_service
-        )
-
-        self.assertEqual(result['failure']['message'], 'InvalidOrderContent()')
-
-        # No ICX amount
-        result = transaction_call_error(
-            super(),
-            from_=self._operator,
-            to_=self._score_address,
-            method="fulfill_icx_order",
+            method="refund_order",
             params={'orderid': o1id},
             icon_service=self.icon_service
         )
 
-        self.assertEqual(result['failure']['message'], 'InvalidOrderContent()')
-
-    def test_fulfill_icx_order_wrong_id(self):
-        swapid, o1id, o2id = self._create_swap_icx()
-
-        # Wrong ID
-        result = transaction_call_error(
-            super(),
-            from_=self._operator,
-            to_=self._score_address,
-            method="fulfill_icx_order",
-            params={'orderid': 123},
-            value=100,
-            icon_service=self.icon_service
-        )
-
-        self.assertEqual(result['failure']['message'], "ItemDoesntExist('ORDER_COMPOSITE', '123')")
-
-    def test_fulfill_icx_order_already_filled(self):
-        swapid, o1id, o2id = self._create_swap_icx()
-
-        # OK
         result = transaction_call_success(
             super(),
-            from_=self._operator,
+            from_=self._user,
             to_=self._score_address,
-            method="fulfill_icx_order",
-            params={'orderid': o1id},
-            value=100,
+            method="refund_order",
+            params={'orderid': o2id},
             icon_service=self.icon_service
         )
 
-        # Already filled
-        result = transaction_call_error(
-            super(),
-            from_=self._operator,
-            to_=self._score_address,
-            method="fulfill_icx_order",
-            params={'orderid': o1id},
-            value=100,
-            icon_service=self.icon_service
-        )
+        # Check refund
+        operator_balance = get_icx_balance(super(), address=self._operator.get_address(), icon_service=self.icon_service)
+        user_balance = get_icx_balance(super(), address=self._user.get_address(), icon_service=self.icon_service)
 
-        self.assertEqual(result['failure']['message'], 'InvalidOrderStatus()')
+        # OK
+        self.assertEqual(operator_balance, self._operator_balance)
+        self.assertEqual(user_balance, self._user_balance)
 
-    def test_fulfill_icx_order_cancelled(self):
+    def test_refund_order_wrong_user(self):
         swapid, o1id, o2id = self._create_swap_icx()
-        self._cancel_swap(swapid)
+        self._fulfill_icx_order(self._operator, o1id, 100)
+        self._fulfill_icx_order(self._user, o2id, 200)
 
-        # Already cancelled
         result = transaction_call_error(
             super(),
-            from_=self._operator,
+            from_=self._user,
             to_=self._score_address,
-            method="fulfill_icx_order",
+            method="refund_order",
             params={'orderid': o1id},
-            value=100,
             icon_service=self.icon_service
         )
+        self.assertEqual(result['failure']['message'], 'InvalidOrderProvider()')
 
-        self.assertEqual(result['failure']['message'], 'InvalidOrderStatus()')
-
-    def test_fulfill_icx_order_no_order(self):
-        swapid, o1id, o2id = self._create_swap_icx()
-        self._cancel_swap(swapid)
-
-        # Already cancelled
         result = transaction_call_error(
             super(),
             from_=self._operator,
             to_=self._score_address,
-            method="fulfill_icx_order",
+            method="refund_order",
+            params={'orderid': o2id},
+            icon_service=self.icon_service
+        )
+        self.assertEqual(result['failure']['message'], 'InvalidOrderProvider()')
+
+    def test_refund_order_no_order(self):
+        swapid, o1id, o2id = self._create_swap_icx()
+        self._fulfill_icx_order(self._operator, o1id, 100)
+        self._fulfill_icx_order(self._user, o2id, 200)
+
+        result = transaction_call_error(
+            super(),
+            from_=self._user,
+            to_=self._score_address,
+            method="refund_order",
             params={'orderid': 123},
-            value=100,
             icon_service=self.icon_service
         )
         self.assertEqual(result['failure']['message'], "ItemDoesntExist('ORDER_COMPOSITE', '123')")
+
+    def test_refund_order_after_swap(self):
+        swapid, o1id, o2id = self._create_swap_icx()
+        self._fulfill_icx_order(self._operator, o1id, 100)
+        self._fulfill_icx_order(self._user, o2id, 200)
+        self._do_swap(swapid)
+
+        result = transaction_call_error(
+            super(),
+            from_=self._user,
+            to_=self._score_address,
+            method="refund_order",
+            params={'orderid': o1id},
+            icon_service=self.icon_service
+        )
+        self.assertEqual(result['failure']['message'], "InvalidOrderStatus()")
+
+    def test_refund_order_after_cancel(self):
+        swapid, o1id, o2id = self._create_swap_icx()
+        self._fulfill_icx_order(self._operator, o1id, 100)
+        self._fulfill_icx_order(self._user, o2id, 200)
+        self._cancel_swap(swapid)
+
+        result = transaction_call_error(
+            super(),
+            from_=self._user,
+            to_=self._score_address,
+            method="refund_order",
+            params={'orderid': o1id},
+            icon_service=self.icon_service
+        )
+        self.assertEqual(result['failure']['message'], "InvalidOrderStatus()")
