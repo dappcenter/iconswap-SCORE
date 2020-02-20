@@ -123,7 +123,7 @@ class Swap(object):
             'order1': self._order1.get(),
             'order2': self._order2.get(),
             'status': self._status.get(),
-            'timestamp_start': self._timestamp.get(),
+            'timestamp': self._timestamp.get(),
             'author': self._author.get()
         }
 
