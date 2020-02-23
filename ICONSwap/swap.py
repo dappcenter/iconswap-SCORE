@@ -34,6 +34,10 @@ class InvalidSwapAuthor(Exception):
     pass
 
 
+class InvalidSwapProvider(Exception):
+    pass
+
+
 class SwapDoesntExist(Exception):
     pass
 

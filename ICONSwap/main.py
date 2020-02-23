@@ -109,10 +109,10 @@ class ICONSwap(IconScoreBase):
     # ================================================
     #  Checks
     # ================================================
-    def _check_orders_provider(self, o1: Order, o2: Order, provider: Address) -> None:
-        """ Check if emitter is one of the provider """
+    def _check_swap_providers(self, o1: Order, o2: Order, provider: Address) -> None:
+        """ Check if emitter is one of the orders provider """
         if o1.provider() != provider and o2.provider() != provider:
-            raise InvalidOrderProvider
+            raise InvalidSwapProvider(o1.provider(), o2.provider(), provider)
 
     def _check_amount(self, amount: int) -> None:
         if amount == 0:
@@ -211,8 +211,8 @@ class ICONSwap(IconScoreBase):
         o2 = Order(self.db, oid2)
         o2.check_status(OrderStatus.FILLED)
 
-        # Check if emitter is one of the provider
-        self._check_orders_provider(o1, o2, self.msg.sender)
+        # Check if emitter is one of the providers
+        self._check_swap_providers(o1, o2, self.msg.sender)
 
         # OK: trade the tokens
         self._transfer_order(o1, o2.provider())

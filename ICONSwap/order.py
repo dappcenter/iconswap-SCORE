@@ -115,7 +115,7 @@ class Order(object):
 
     def check_provider(self, provider: Address) -> None:
         if self._provider.get() != provider:
-            raise InvalidOrderProvider
+            raise InvalidOrderProvider(self._provider.get(), provider)
 
     # ================================================
     #  Public Methods
