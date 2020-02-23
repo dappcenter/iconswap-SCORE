@@ -73,13 +73,11 @@ class OrderComposite(Composite):
     def __init__(self, db: IconScoreDatabase):
         super().__init__(db, OrderComposite._NAME, int)
 
-
 class OrderStatus:
     EMPTY = 0
     FILLED = 1
     CANCELLED = 2
     SUCCESS = 3
-
 
 class Order(object):
     # ================================================
@@ -149,7 +147,7 @@ class Order(object):
         return {
             'contract': self._contract.get(),
             'amount': self._amount.get(),
-            'status': self._status.get(),
+            'status': Utils.enum_names(OrderStatus)[self._status.get()],
             'provider': self._provider.get()
         }
 

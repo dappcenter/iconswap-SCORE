@@ -171,6 +171,7 @@ class ICONSwap(IconScoreBase):
 
         # Set the swap status as unavailable
         swap.set_status(SwapStatus.CANCELLED)
+        swap.set_transaction(self.tx.hash.hex())
         o1.set_status(OrderStatus.CANCELLED)
         o2.set_status(OrderStatus.CANCELLED)
         self.SwapCancelledEvent(swapid)
@@ -220,6 +221,7 @@ class ICONSwap(IconScoreBase):
         self.OrderTransferedEvent(oid2, o2.contract(), o2.amount(), o1.provider())
 
         swap.set_status(SwapStatus.SUCCESS)
+        swap.set_transaction(self.tx.hash.hex())
         o1.set_status(OrderStatus.SUCCESS)
         o2.set_status(OrderStatus.SUCCESS)
         self.SwapSuccessEvent(swapid)

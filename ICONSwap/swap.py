@@ -56,6 +56,7 @@ class SwapFactory(Factory):
         item._timestamp.set(timestamp)
         item._author.set(author)
         item._status.set(SwapStatus.PENDING)
+        item._transaction.set('')
         SwapComposite(db).add(uid)
 
         return uid
@@ -83,6 +84,7 @@ class Swap(object):
     _STATUS = 'SWAP_STATUS'
     _TIMESTAMP = 'SWAP_TIMESTAMP'
     _AUTHOR = 'SWAP_AUTHOR'
+    _TRANSACTION = 'SWAP_TRANSACTION'
 
     # ================================================
     #  Initialization
@@ -93,6 +95,7 @@ class Swap(object):
         self._status = VarDB(f'{Swap._STATUS}_{uid}', db, value_type=int)
         self._timestamp = VarDB(f'{Swap._TIMESTAMP}_{uid}', db, value_type=int)
         self._author = VarDB(f'{Swap._AUTHOR}_{uid}', db, value_type=Address)
+        self._transaction = VarDB(f'{Swap._TRANSACTION}_{uid}', db, value_type=str)
 
     # ================================================
     #  Private Methods
@@ -114,6 +117,9 @@ class Swap(object):
     # ================================================
     def set_status(self, status: int) -> None:
         self._status.set(status)
+    
+    def set_transaction(self, transaction: str) -> None:
+        self._transaction.set(transaction)
 
     def get_orders(self) -> tuple:
         return (self._order1.get(), self._order2.get())
@@ -122,9 +128,10 @@ class Swap(object):
         return {
             'order1': self._order1.get(),
             'order2': self._order2.get(),
-            'status': self._status.get(),
+            'status': Utils.enum_names(SwapStatus)[self._status.get()],
             'timestamp': self._timestamp.get(),
-            'author': self._author.get()
+            'author': self._author.get(),
+            'transaction': self._transaction.get()
         }
 
     def delete(self) -> None:
@@ -133,3 +140,4 @@ class Swap(object):
         self._status.remove()
         self._timestamp.remove()
         self._author.remove()
+        self._transaction.remove()
