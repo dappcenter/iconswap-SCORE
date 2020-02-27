@@ -63,3 +63,9 @@ class Composite:
     def remove(self, item) -> None:
         self.check_exists(item)
         del self._idb[item]
+
+    def serialize(self, db: IconScoreDatabase, objtype: type, cond=None) -> dict:
+        objs = {k: objtype(db, v) for k, v in self._idb.items()}
+        if cond:
+            objs = dict(filter(lambda t: cond(t[1]), objs.items()))
+        return {k: v.serialize() for k, v in objs.items()}

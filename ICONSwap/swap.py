@@ -66,13 +66,6 @@ class SwapFactory(Factory):
         return uid
 
 
-class SwapComposite(Composite):
-    _NAME = 'SWAP_COMPOSITE'
-
-    def __init__(self, db: IconScoreDatabase):
-        super().__init__(db, SwapComposite._NAME, int)
-
-
 class SwapStatus:
     PENDING = 0
     CANCELLED = 1
@@ -135,7 +128,7 @@ class Swap(object):
             'status': Utils.enum_names(SwapStatus)[self._status.get()],
             'timestamp': self._timestamp.get(),
             'author': self._author.get(),
-            'transaction': self._transaction.get()
+            'transaction': self._transaction.get() or ''
         }
 
     def delete(self) -> None:
@@ -145,3 +138,14 @@ class Swap(object):
         self._timestamp.remove()
         self._author.remove()
         self._transaction.remove()
+
+
+class SwapComposite(Composite):
+    _NAME = 'SWAP_COMPOSITE'
+
+    def __init__(self, db: IconScoreDatabase):
+        super().__init__(db, SwapComposite._NAME, int)
+
+    @staticmethod
+    def pending(swap: Swap) -> bool:
+        return swap._status.get() == SwapStatus.PENDING

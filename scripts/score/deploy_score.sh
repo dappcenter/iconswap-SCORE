@@ -31,6 +31,8 @@ COMMAND
             echo -e "New SCORE address detected : ${score_address}"
             echo -ne "${score_address}" > "./config/${network}/score_address.txt"
         fi
+    else
+        echo "An error maybe occured. Exit code : ${exitcode}"
     fi
 }
 

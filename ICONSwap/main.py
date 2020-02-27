@@ -257,6 +257,11 @@ class ICONSwap(IconScoreBase):
 
     @catch_error
     @external(readonly=True)
+    def get_pending_swaps(self) -> dict:
+        return SwapComposite(self.db).serialize(self.db, Swap, SwapComposite.pending)
+
+    @catch_error
+    @external(readonly=True)
     def get_whitelist(self) -> list:
         return Whitelist(self.db).serialize()
 
