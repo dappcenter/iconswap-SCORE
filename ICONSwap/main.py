@@ -25,6 +25,10 @@ from .irc2_interface import *
 from .consts import *
 
 
+class InvalidTokenFallbackParams(Exception):
+    pass
+
+
 class ICONSwap(IconScoreBase):
     """ ICONSwap SCORE Base implementation """
 
@@ -32,27 +36,27 @@ class ICONSwap(IconScoreBase):
     #  Event Logs
     # ================================================
     @eventlog(indexed=1)
-    def SwapCreatedEvent(self, swapid: int, o1id: int, o2id: int) -> None:
+    def SwapCreatedEvent(self, swap_id: int, maker_id: int, taker_id: int) -> None:
         pass
 
     @eventlog(indexed=1)
-    def SwapSuccessEvent(self, swapid: int) -> None:
+    def SwapSuccessEvent(self, swap_id: int) -> None:
         pass
 
     @eventlog(indexed=1)
-    def SwapCancelledEvent(self, swapid: int) -> None:
+    def SwapCancelledEvent(self, swap_id: int) -> None:
         pass
 
     @eventlog(indexed=1)
-    def OrderFilledEvent(self, orderid: int) -> None:
+    def OrderFilledEvent(self, order_id: int) -> None:
         pass
 
     @eventlog(indexed=1)
-    def OrderTransferedEvent(self, orderid: int, contract: Address, amount: int, provider: Address) -> None:
+    def OrderTransferedEvent(self, order_id: int, contract: Address, amount: int, provider: Address) -> None:
         pass
 
     @eventlog(indexed=1)
-    def OrderRefundedEvent(self, orderid: int) -> None:
+    def OrderRefundedEvent(self, order_id: int) -> None:
         pass
 
     # ================================================
@@ -87,33 +91,78 @@ class ICONSwap(IconScoreBase):
     def _is_icx(self, order: Order) -> bool:
         return order.contract() == ZERO_SCORE_ADDRESS
 
-    def _fulfill_order(self, uid: int, contract: Address, amount: int, provider: Address) -> None:
+    def _fill_swap(self, swap_id: int, taker_contract: Address, taker_amount: int, taker_address: Address) -> None:
         """
-            uid: The order UID
-            contract: The token governance contract address.
+            swap_id: The swap UID
+            taker_contract: The token governance taker_contract address.
                       For ICX, it should be ZERO_SCORE_ADDRESS.
                       It needs to match the order or it will fail.
-            amount: The amount of token traded.
-                    It needs to match exactly the order amount or it will fail.
-            provider: The address of the account providing the funds. If an error occurs
-                      or if the trade is cancelled, the funds will be sent back to this address
+            taker_amount: The amount of token traded.
+                    It needs to match exactly the taker order amount or it will fail.
+            taker_address: The address of the account providing the funds. If an error occurs
+                      or if the trade isn't opened anymore, the funds will be sent back to this address
         """
-        Logger.warning('\n   === fulfill_order(%d, %s, %d, %s)' % (uid, str(contract), amount, str(provider)), TAG)
-        OrderComposite(self.db).check_exists(uid)
-        order = Order(self.db, uid)
-        order.check_status(OrderStatus.EMPTY)
-        order.check_content(contract, amount)
-        order.fill(provider)
-        self.OrderFilledEvent(uid)
+        Logger.warning('\n   === _fill_swap(%d, %s, %d, %s)' % (swap_id, taker_contract, taker_amount, taker_address), TAG)
+
+        # Check if swap exists
+        SwapComposite(self.db).check_exists(swap_id)
+        swap = Swap(self.db, swap_id)
+
+        # Check if the swap is pending
+        swap.check_status(SwapStatus.PENDING)
+
+        # Check if maker order is filled
+        maker_id, taker_id = swap.get_orders()
+        maker = Order(self.db, maker_id)
+        taker = Order(self.db, taker_id)
+        maker.check_status(OrderStatus.FILLED)
+
+        # Check if taker order is empty
+        taker = Order(self.db, taker_id)
+        taker.check_status(OrderStatus.EMPTY)
+
+        # Check taker order content
+        taker.check_content(taker_contract, taker_amount)
+
+        # OK!
+        taker.fill(taker_address)
+        self.OrderFilledEvent(taker_id)
+
+        # Both orders are filled : do the swap
+        self._do_swap(swap_id)
+
+    def _do_swap(self, swap_id: int) -> None:
+        Logger.warning('\n   === do_swap(%d)' % swap_id, TAG)
+
+        # Check if swap exists
+        SwapComposite(self.db).check_exists(swap_id)
+        swap = Swap(self.db, swap_id)
+
+        # Check if the swap is pending
+        swap.check_status(SwapStatus.PENDING)
+
+        # Check if the orders are filled
+        maker_id, taker_id = swap.get_orders()
+        maker = Order(self.db, maker_id)
+        taker = Order(self.db, taker_id)
+        maker.check_status(OrderStatus.FILLED)
+        taker.check_status(OrderStatus.FILLED)
+
+        # OK: trade the tokens
+        self._transfer_order(maker, taker.provider())
+        self._transfer_order(taker, maker.provider())
+        self.OrderTransferedEvent(maker_id, maker.contract(), maker.amount(), taker.provider())
+        self.OrderTransferedEvent(taker_id, taker.contract(), taker.amount(), maker.provider())
+
+        swap.set_status(SwapStatus.SUCCESS)
+        swap.set_transaction(self.tx.hash.hex())
+        maker.set_status(OrderStatus.SUCCESS)
+        taker.set_status(OrderStatus.SUCCESS)
+        self.SwapSuccessEvent(swap_id)
 
     # ================================================
     #  Checks
     # ================================================
-    def _check_swap_providers(self, o1: Order, o2: Order, provider: Address) -> None:
-        """ Check if emitter is one of the orders provider """
-        if o1.provider() != provider and o2.provider() != provider:
-            raise InvalidSwapProvider(o1.provider(), o2.provider(), provider)
-
     def _check_amount(self, amount: int) -> None:
         if amount == 0:
             raise InvalidOrderAmount
@@ -123,137 +172,126 @@ class ICONSwap(IconScoreBase):
             raise InvalidOrderContract
         Whitelist(self.db).check_exists(address)
 
+    def _create_swap(self,
+                     maker_contract: Address,
+                     maker_amount: int,
+                     taker_contract: Address,
+                     taker_amount: int,
+                     maker_address: Address) -> None:
+        Logger.warning('\n   === create_swap(%s, %d, %s, %d)' % (maker_contract, maker_amount, taker_contract, taker_amount), TAG)
+
+        self._check_contract(maker_contract)
+        self._check_contract(taker_contract)
+        self._check_amount(maker_amount)
+        self._check_amount(taker_amount)
+
+        # Create orders
+        maker_id = OrderFactory.create(self.db, maker_contract, maker_amount)
+        taker_id = OrderFactory.create(self.db, taker_contract, taker_amount)
+        swap_id = SwapFactory.create(self.db, maker_id, taker_id, self.now(), self.msg.sender)
+        self.SwapCreatedEvent(swap_id, maker_id, taker_id)
+
+        # Funds has been sent for maker
+        maker = Order(self.db, maker_id)
+        maker.fill(maker_address)
+        self.OrderFilledEvent(maker_id)
+
     # ================================================
     #  External methods
     # ================================================
     @catch_error
     @external
-    def create_swap(self, contract1: Address, amount1: int, contract2: Address, amount2: int) -> None:
-        Logger.warning('\n   === create_swap(%s, %d, %s, %d)' % (str(contract1), amount1, str(contract2), amount2), TAG)
-    
-        self._check_contract(contract1)
-        self._check_contract(contract2)
-        self._check_amount(amount1)
-        self._check_amount(amount2)
-
-        # Create orders
-        uid1 = OrderFactory.create(self.db, contract1, amount1)
-        uid2 = OrderFactory.create(self.db, contract2, amount2)
-        swap = SwapFactory.create(self.db, uid1, uid2, self.now(), self.msg.sender)
-        self.SwapCreatedEvent(swap, uid1, uid2)
-
-    @catch_error
-    @external
-    def cancel_swap(self, swapid: int) -> None:
-        Logger.warning('\n   === cancel_swap(%d)' % swapid)
-        SwapComposite(self.db).check_exists(swapid)
-
-        # Must be pending
-        swap = Swap(self.db, swapid)
-        swap.check_status(SwapStatus.PENDING)
-
-        # Only the swap author can cancel it
-        swap.check_author(self.msg.sender)
-
-        # Get the orders associated with the swap
-        oid1, oid2 = swap.get_orders()
-        o1 = Order(self.db, oid1)
-        o2 = Order(self.db, oid2)
-
-        # Refund if filled
-        if o1.status() == OrderStatus.FILLED:
-            self._refund_order(o1)
-            self.OrderRefundedEvent(oid1)
-
-        if o2.status() == OrderStatus.FILLED:
-            self._refund_order(o2)
-            self.OrderRefundedEvent(oid2)
-
-        # Set the swap status as unavailable
-        swap.set_status(SwapStatus.CANCELLED)
-        swap.set_transaction(self.tx.hash.hex())
-        o1.set_status(OrderStatus.CANCELLED)
-        o2.set_status(OrderStatus.CANCELLED)
-        self.SwapCancelledEvent(swapid)
-
-    @catch_error
-    @external
-    def refund_order(self, orderid: int) -> None:
-        Logger.warning('\n   === refund_order(%d)' % orderid)
-        OrderComposite(self.db).check_exists(orderid)
-
-        # Must be filled
-        order = Order(self.db, orderid)
-        order.check_status(OrderStatus.FILLED)
-
-        # Caller must be provider
-        order.check_provider(self.msg.sender)
-
-        # OK
-        self._refund_order(order)
-        self.OrderRefundedEvent(orderid)
-
-    @catch_error
-    @external
-    def do_swap(self, swapid: int) -> None:
-        Logger.warning('\n   === do_swap(%d)' % swapid, TAG)
-
-        SwapComposite(self.db).check_exists(swapid)
-        swap = Swap(self.db, swapid)
-
-        # Check if the swap is pending
-        swap.check_status(SwapStatus.PENDING)
-
-        # Check if the orders are filled
-        oid1, oid2 = swap.get_orders()
-        o1 = Order(self.db, oid1)
-        o1.check_status(OrderStatus.FILLED)
-        o2 = Order(self.db, oid2)
-        o2.check_status(OrderStatus.FILLED)
-
-        # Check if emitter is one of the providers
-        self._check_swap_providers(o1, o2, self.msg.sender)
-
-        # OK: trade the tokens
-        self._transfer_order(o1, o2.provider())
-        self.OrderTransferedEvent(oid1, o1.contract(), o1.amount(), o2.provider())
-        self._transfer_order(o2, o1.provider())
-        self.OrderTransferedEvent(oid2, o2.contract(), o2.amount(), o1.provider())
-
-        swap.set_status(SwapStatus.SUCCESS)
-        swap.set_transaction(self.tx.hash.hex())
-        o1.set_status(OrderStatus.SUCCESS)
-        o2.set_status(OrderStatus.SUCCESS)
-        self.SwapSuccessEvent(swapid)
-
-    @catch_error
-    @external
     def tokenFallback(self, _from: Address, _value: int, _data: bytes) -> None:
         Logger.warning('\n   === tokenFallback(%s, %d)' % (str(_from), _value), TAG)
-        if _data is None or _data == b'None':
-            raise InvalidOrderId
 
-        uid = int.from_bytes(_data, 'big')
-        self._fulfill_order(uid, self.msg.sender, _value, _from)
+        if _data is None or _data == b'None':
+            raise InvalidTokenFallbackParams
+
+        params = json_loads(_data.decode('utf-8'))
+
+        if params['action'] == 'create_irc2_swap':
+            maker_contract = self.msg.sender
+            maker_amount = _value
+            maker_address = _from
+            taker_contract = Address.from_string(params['taker_contract'])
+            taker_amount = params['taker_amount']
+            self._create_swap(maker_contract, maker_amount, taker_contract, taker_amount, maker_address)
+
+        elif params['action'] == 'fill_irc2_order':
+            taker_contract = self.msg.sender
+            taker_amount = _value
+            taker_address = _from
+            swap_id = params['swap_id']
+            self._fill_swap(swap_id, taker_contract, taker_amount, taker_address)
+
+        else:
+            raise InvalidTokenFallbackParams
 
     @catch_error
     @external
     @payable
-    def fulfill_icx_order(self, orderid: int) -> None:
-        Logger.warning('\n   === fulfill_icx_order(%d)' % orderid, TAG)
-        provider = self.msg.sender
-        amount = self.msg.value
-        self._fulfill_order(orderid, ZERO_SCORE_ADDRESS, amount, provider)
+    def create_icx_swap(self, taker_contract: Address, taker_amount: int) -> None:
+        Logger.warning('\n   === create_icx_swap(%s, %d)' % (taker_contract, taker_amount), TAG)
+        maker_address = self.msg.sender
+        maker_amount = self.msg.value
+        self._create_swap(ZERO_SCORE_ADDRESS, maker_amount, taker_contract, taker_amount, maker_address)
+
+    @catch_error
+    @external
+    def cancel_swap(self, swap_id: int) -> None:
+        Logger.warning('\n   === cancel_swap(%d)' % swap_id)
+
+        # Check if swap exists
+        SwapComposite(self.db).check_exists(swap_id)
+        swap = Swap(self.db, swap_id)
+
+        # Only the maker can cancel the swap
+        swap.check_maker_address(self.msg.sender)
+
+        # Swap must be pending
+        swap.check_status(SwapStatus.PENDING)
+
+        # Get the orders associated with the swap
+        maker_id, taker_id = swap.get_orders()
+        maker = Order(self.db, maker_id)
+        taker = Order(self.db, taker_id)
+
+        # Refund if filled
+        if maker.status() == OrderStatus.FILLED:
+            self._refund_order(maker)
+            self.OrderRefundedEvent(maker_id)
+
+        if taker.status() == OrderStatus.FILLED:
+            self._refund_order(taker)
+            self.OrderRefundedEvent(taker_id)
+
+        # Set the swap status as unavailable
+        swap.set_status(SwapStatus.CANCELLED)
+        swap.set_transaction(self.tx.hash.hex())
+        maker.set_status(OrderStatus.CANCELLED)
+        taker.set_status(OrderStatus.CANCELLED)
+        self.SwapCancelledEvent(swap_id)
+
+    @catch_error
+    @external
+    @payable
+    def fill_icx_order(self, swap_id: int) -> None:
+        Logger.warning('\n   === fill_icx_order(%d)' % swap_id, TAG)
+        taker_amount = self.msg.value
+        taker_address = self.msg.sender
+        self._fill_swap(swap_id, ZERO_SCORE_ADDRESS, taker_amount, taker_address)
 
     @catch_error
     @external(readonly=True)
-    def get_swap(self, swapid: int) -> dict:
-        return Swap(self.db, swapid).serialize()
+    def get_swap(self, swap_id: int) -> dict:
+        SwapComposite(self.db).check_exists(swap_id)
+        return Swap(self.db, swap_id).serialize()
 
     @catch_error
     @external(readonly=True)
-    def get_order(self, orderid: int) -> dict:
-        return Order(self.db, orderid).serialize()
+    def get_order(self, order_id: int) -> dict:
+        OrderComposite(self.db).check_exists(order_id)
+        return Order(self.db, order_id).serialize()
 
     @catch_error
     @external(readonly=True)

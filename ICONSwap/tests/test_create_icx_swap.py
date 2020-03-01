@@ -85,55 +85,54 @@ class TestICONSwap(IconIntegrateTestBase):
         )
 
     # ===============================================================
-    def test_create_swap_ok(self):
+    def test_create_icx_swap_ok(self):
         self._add_whitelist('cx0000000000000000000000000000000000000000')
         # OK
         result = transaction_call_success(
             super(),
             from_=self._operator,
             to_=self._score_address,
-            method="create_swap",
+            method="create_icx_swap",
             params={
-                'contract1': 'cx0000000000000000000000000000000000000000',
-                'amount1': 100,
-                'contract2': 'cx0000000000000000000000000000000000000000',
-                'amount2': 200
+                'taker_contract': 'cx0000000000000000000000000000000000000000',
+                'taker_amount': 200
             },
+            value=100,
             icon_service=self.icon_service
         )
+        indexed = result['eventLogs'][0]['indexed']
+        self.assertEqual(indexed[0], 'SwapCreatedEvent(int,int,int)')
 
-    def test_create_swap_not_whitelisted(self):
+    def test_create_icx_swap_not_whitelisted(self):
         # cx000... is not whitelisted
         result = transaction_call_error(
             super(),
             from_=self._operator,
             to_=self._score_address,
-            method="create_swap",
+            method="create_icx_swap",
             params={
-                'contract1': 'cx0000000000000000000000000000000000000000',
-                'amount1': 100,
-                'contract2': 'cx0000000000000000000000000000000000000000',
-                'amount2': 200
+                'taker_contract': 'cx0000000000000000000000000000000000000000',
+                'taker_amount': 200
             },
+            value=100,
             icon_service=self.icon_service
         )
         self.assertEqual(result['failure']['message'], "ItemDoesntExist('WHITELIST_COMPOSITE', 'cx0000000000000000000000000000000000000000')")
 
 
-    def test_create_swap_zero_amount(self):
+    def test_create_icx_swap_zero_amount(self):
         self._add_whitelist('cx0000000000000000000000000000000000000000')
         # Amount cannot be zero
         result = transaction_call_error(
             super(),
             from_=self._operator,
             to_=self._score_address,
-            method="create_swap",
+            method="create_icx_swap",
             params={
-                'contract1': 'cx0000000000000000000000000000000000000000',
-                'amount1': 0,
-                'contract2': 'cx0000000000000000000000000000000000000000',
-                'amount2': 200
+                'taker_contract': 'cx0000000000000000000000000000000000000000',
+                'taker_amount': 200
             },
+            value=0,
             icon_service=self.icon_service
         )
 
@@ -144,32 +143,31 @@ class TestICONSwap(IconIntegrateTestBase):
             super(),
             from_=self._operator,
             to_=self._score_address,
-            method="create_swap",
+            method="create_icx_swap",
             params={
-                'contract1': 'cx0000000000000000000000000000000000000000',
-                'amount1': 100,
-                'contract2': 'cx0000000000000000000000000000000000000000',
-                'amount2': 0
+                'taker_contract': 'cx0000000000000000000000000000000000000000',
+                'taker_amount': 0
             },
+            value=100,
             icon_service=self.icon_service
         )
 
         self.assertEqual(result['failure']['message'], 'InvalidOrderAmount()')
 
-    def test_create_swap_badaddr(self):
+    def test_create_icx_swap_badaddr(self):
         self._add_whitelist('cx0000000000000000000000000000000000000000')
-        # Contract must be a contract
+
+        # "taker_contract" must be a contract
         result = transaction_call_error(
             super(),
             from_=self._operator,
             to_=self._score_address,
-            method="create_swap",
+            method="create_icx_swap",
             params={
-                'contract1': 'hx0000000000000000000000000000000000000000',
-                'amount1': 100,
-                'contract2': 'cx0000000000000000000000000000000000000000',
-                'amount2': 200
+                'taker_contract': 'hx0000000000000000000000000000000000000000',
+                'taker_amount': 0
             },
+            value=100,
             icon_service=self.icon_service
         )
         self.assertEqual(result['failure']['message'], 'InvalidOrderContract()')
@@ -179,29 +177,12 @@ class TestICONSwap(IconIntegrateTestBase):
             super(),
             from_=self._operator,
             to_=self._score_address,
-            method="create_swap",
+            method="create_icx_swap",
             params={
-                'contract1': 'hx0000000000000000000000000000000000000000',
-                'amount1': 100,
-                'contract2': 'hx0000000000000000000000000000000000000000',
-                'amount2': 200
+                'taker_contract': '123',
+                'taker_amount': 0
             },
-            icon_service=self.icon_service
-        )
-        self.assertEqual(result['failure']['message'], 'InvalidOrderContract()')
-
-        # Contract must be a contract
-        result = transaction_call_error(
-            super(),
-            from_=self._operator,
-            to_=self._score_address,
-            method="create_swap",
-            params={
-                'contract1': '123',
-                'amount1': 100,
-                'contract2': 'cx0000000000000000000000000000000000000000',
-                'amount2': 200
-            },
+            value=100,
             icon_service=self.icon_service
         )
         self.assertEqual(result['failure']['message'], 'Invalid address')

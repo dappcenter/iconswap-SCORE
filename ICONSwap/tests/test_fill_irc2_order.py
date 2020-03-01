@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import os
+import json
 
 from iconsdk.builder.transaction_builder import DeployTransactionBuilder
 from iconsdk.builder.call_builder import CallBuilder
@@ -27,7 +28,7 @@ from tbears.libs.icon_integrate_test import IconIntegrateTestBase, SCORE_INSTALL
 from ICONSwap.tests.utils import *
 
 DIR_PATH = os.path.abspath(os.path.dirname(__file__))
-ZERO_EOA = 'cx0000000000000000000000000000000000000000'
+ICX_CONTRACT = 'cx0000000000000000000000000000000000000000'
 
 class TestICONSwap(IconIntegrateTestBase):
     TEST_HTTP_ENDPOINT_URI_V3 = "http://127.0.0.1:9000/api/v3"
@@ -43,7 +44,6 @@ class TestICONSwap(IconIntegrateTestBase):
 
         # install SCORE
         self._score_address = self._deploy_score(self.SCORE_PROJECT)['scoreAddress']
-        self._irc2_address = self._deploy_irc2(self.IRC2_PROJECT)['scoreAddress']
         self._operator = self._test1
         self._user = self._wallet_array[0]
         self._attacker = self._wallet_array[1]
@@ -54,6 +54,8 @@ class TestICONSwap(IconIntegrateTestBase):
 
         self._operator_balance = get_icx_balance(super(), address=self._operator.get_address(), icon_service=self.icon_service)
         self._user_balance = get_icx_balance(super(), address=self._user.get_address(), icon_service=self.icon_service)
+        self._irc2_address = self._deploy_irc2(self.IRC2_PROJECT)['scoreAddress']
+        self._irc2_address_2 = self._deploy_irc2(self.IRC2_PROJECT)['scoreAddress']
 
     def _deploy_score(self, project, to: str = SCORE_INSTALL_ADDRESS) -> dict:
         # Generates an instance of transaction for deploying SCORE.
@@ -89,7 +91,7 @@ class TestICONSwap(IconIntegrateTestBase):
                 "_name": 'StandardToken',
                 "_symbol": 'ST',
             }) \
-            .from_(self._test1.get_address()) \
+            .from_(self._user.get_address()) \
             .to(to) \
             .step_limit(100_000_000_000) \
             .nid(3) \
@@ -99,7 +101,7 @@ class TestICONSwap(IconIntegrateTestBase):
             .build()
 
         # Returns the signed transaction object having a signature
-        signed_transaction = SignedTransaction(transaction, self._test1)
+        signed_transaction = SignedTransaction(transaction, self._user)
 
         # process the transaction in local
         result = self.process_transaction(
@@ -122,41 +124,27 @@ class TestICONSwap(IconIntegrateTestBase):
             icon_service=self.icon_service
         )
 
-    def _create_swap(self, c1, a1, c2, a2):
-        # OK
+    def _create_icx_swap(self):
         result = transaction_call_success(
             super(),
             from_=self._operator,
             to_=self._score_address,
-            method="create_swap",
+            method="create_icx_swap",
             params={
-                'contract1': c1,
-                'amount1': a1,
-                'contract2': c2,
-                'amount2': a2
+                'taker_contract': self._irc2_address,
+                'taker_amount': 200
             },
+            value=100,
             icon_service=self.icon_service
         )
-
         indexed = result['eventLogs'][0]['indexed']
         self.assertEqual(indexed[0], 'SwapCreatedEvent(int,int,int)')
-        swapid = int(indexed[1], 16)
-        o1id, o2id = map(lambda x: int(x, 16), result['eventLogs'][0]['data'])
-        return swapid, o1id, o2id
+        swap_id = int(indexed[1], 16)
+        maker_id, taker_id = map(lambda x: int(x, 16), result['eventLogs'][0]['data'])
+        return swap_id, maker_id, taker_id
 
-    def _fulfill_icx_order(self, _from, orderid, amount):
-        result = transaction_call_success(
-            super(),
-            from_=_from,
-            to_=self._score_address,
-            method="fulfill_icx_order",
-            params={'orderid': orderid},
-            value=amount,
-            icon_service=self.icon_service
-        )
-
-    def _fulfill_irc2_order(self, _from, orderid, amount):
-        result = transaction_call_success(
+    def _transfer_irc2(self, call, _from, amount, params):
+        return call(
             super(),
             from_=_from,
             to_=self._irc2_address,
@@ -164,74 +152,87 @@ class TestICONSwap(IconIntegrateTestBase):
             params={
                 '_to': self._score_address, 
                 '_value': amount, 
-                '_data': orderid.to_bytes(4, 'big')},
+                '_data': json.dumps(params).encode('utf-8')},
             icon_service=self.icon_service
         )
 
-    def _fulfill_irc2_order_error(self, _from, orderid, amount):
-        return transaction_call_error(
-            super(),
-            from_=_from,
-            to_=self._irc2_address,
-            method="transfer",
-            params={
-                '_to': self._score_address, 
-                '_value': amount, 
-                '_data': orderid.to_bytes(4, 'big')},
-            icon_service=self.icon_service
-        )
+    def _transfer_irc2_success(self, _from, amount, params):
+        return self._transfer_irc2(transaction_call_success, _from, amount, params)
 
-    def _do_swap(self, swapid):
-        return transaction_call_success(
-            super(),
-            from_=self._operator,
-            to_=self._score_address,
-            method="do_swap",
-            params={'swapid': swapid},
-            icon_service=self.icon_service
-        )
+    def _transfer_irc2_error(self, _from, amount, params):
+        return self._transfer_irc2(transaction_call_error, _from, amount, params)
 
     # ===============================================================
-    def test_tokenFallback_ok(self):
+    def test_fill_irc2_order_ok(self):
         self._add_whitelist(self._irc2_address)
-        self._add_whitelist(ZERO_EOA)
-        swapid, o1id, o2id = self._create_swap(self._irc2_address, 100, ZERO_EOA, 200)
-
-        self._fulfill_irc2_order(self._operator, o1id, 100)
-        self._fulfill_icx_order(self._user, o2id, 200)
-        self._do_swap(swapid)
+        self._add_whitelist(ICX_CONTRACT)
+        swap_id, maker_id, taker_id = self._create_icx_swap()
+        result = self._transfer_irc2_success (self._user, 200, {
+            'action': 'fill_irc2_order',
+            'swap_id': swap_id
+        })
 
         # Check trade
         operator_balance = get_icx_balance(super(), address=self._operator.get_address(), icon_service=self.icon_service)
         user_balance = get_icx_balance(super(), address=self._user.get_address(), icon_service=self.icon_service)
-
-        # OK
-        self.assertEqual(int(operator_balance, 16), int(self._operator_balance, 16) + 200)
-        self.assertEqual(int(user_balance, 16), int(self._user_balance, 16) - 200)
+        self.assertEqual(int(operator_balance, 16), int(self._operator_balance, 16) - 100)
+        self.assertEqual(int(user_balance, 16), int(self._user_balance, 16) + 100)
 
         balance_irc2 = icx_call(
             super(),
-            from_=self._user.get_address(),
+            from_=self._operator.get_address(),
             to_=self._irc2_address,
             method="balanceOf",
-            params={'_owner': self._user.get_address()},
+            params={'_owner': self._operator.get_address()},
             icon_service=self.icon_service
         )
 
-        self.assertEqual(int(balance_irc2, 16), 100)
+        self.assertEqual(int(balance_irc2, 16), 200)
 
-    def test_tokenFallback_wrong_amount(self):
+    def test_fill_irc2_order_wrong_amount(self):
         self._add_whitelist(self._irc2_address)
-        self._add_whitelist(ZERO_EOA)
-        swapid, o1id, o2id = self._create_swap(self._irc2_address, 100, ZERO_EOA, 200)
-
-        result = self._fulfill_irc2_order_error(self._operator, o1id, 200)
+        self._add_whitelist(ICX_CONTRACT)
+        swap_id, maker_id, taker_id = self._create_icx_swap()
+        result = self._transfer_irc2_error (self._user, 123, {
+            'action': 'fill_irc2_order',
+            'swap_id': swap_id
+        })
         self.assertEqual(result['failure']['message'], "InvalidOrderContent()")
 
-    def test_tokenFallback_not_whitelisted(self):
+    def test_fill_irc2_order_invalid_token(self):
         self._add_whitelist(self._irc2_address)
-        self._add_whitelist(ZERO_EOA)
-        swapid, o1id, o2id = self._create_swap(self._irc2_address, 100, ZERO_EOA, 200)
+        self._add_whitelist(ICX_CONTRACT)
+        swap_id, maker_id, taker_id = self._create_icx_swap()
+        params = {
+            'action': 'fill_irc2_order',
+            'swap_id': swap_id
+        }
+        result = transaction_call_error(
+            super(),
+            from_=self._user,
+            to_=self._irc2_address_2,
+            method="transfer",
+            params={
+                '_to': self._score_address, 
+                '_value': 100, 
+                '_data': json.dumps(params).encode('utf-8')},
+            icon_service=self.icon_service
+        )
 
-        result = self._fulfill_irc2_order_error(self._operator, o1id, 200)
         self.assertEqual(result['failure']['message'], "InvalidOrderContent()")
+    
+    def test_fill_irc2_order_already_filled(self):
+        self._add_whitelist(self._irc2_address)
+        self._add_whitelist(ICX_CONTRACT)
+        swap_id, maker_id, taker_id = self._create_icx_swap()
+        result = self._transfer_irc2_success (self._user, 200, {
+            'action': 'fill_irc2_order',
+            'swap_id': swap_id
+        })
+
+        result = self._transfer_irc2_error (self._user, 200, {
+            'action': 'fill_irc2_order',
+            'swap_id': swap_id
+        })
+        self.assertEqual(result['failure']['message'], "InvalidSwapStatus()")
+

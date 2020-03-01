@@ -37,10 +37,6 @@ class InvalidOrderProvider(Exception):
     pass
 
 
-class InvalidOrderId(Exception):
-    pass
-
-
 class InvalidOrderAmount(Exception):
     pass
 
