@@ -51,14 +51,14 @@ class SwapFactory(Factory):
                maker_order_id: int,
                taker_order_id: int,
                timestamp: int,
-               author: Address) -> int:
+               maker_address: Address) -> int:
 
         uid = Factory.get_uid(db, 'SWAP')
         item = Swap(db, uid)
         item._maker_order_id.set(maker_order_id)
         item._taker_order_id.set(taker_order_id)
         item._timestamp.set(timestamp)
-        item._maker_address.set(author)
+        item._maker_address.set(maker_address)
         item._status.set(SwapStatus.PENDING)
         item._transaction.set('')
         SwapComposite(db).add(uid)
@@ -127,7 +127,7 @@ class Swap(object):
             'taker_order_id': self._taker_order_id.get(),
             'status': Utils.enum_names(SwapStatus)[self._status.get()],
             'timestamp': self._timestamp.get(),
-            'author': self._maker_address.get(),
+            'maker_address': self._maker_address.get(),
             'transaction': self._transaction.get() or ''
         }
 

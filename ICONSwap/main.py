@@ -188,7 +188,7 @@ class ICONSwap(IconScoreBase):
         # Create orders
         maker_id = OrderFactory.create(self.db, maker_contract, maker_amount)
         taker_id = OrderFactory.create(self.db, taker_contract, taker_amount)
-        swap_id = SwapFactory.create(self.db, maker_id, taker_id, self.now(), self.msg.sender)
+        swap_id = SwapFactory.create(self.db, maker_id, taker_id, self.now(), maker_address)
         self.SwapCreatedEvent(swap_id, maker_id, taker_id)
 
         # Funds has been sent for maker
@@ -214,14 +214,16 @@ class ICONSwap(IconScoreBase):
             maker_amount = _value
             maker_address = _from
             taker_contract = Address.from_string(params['taker_contract'])
-            taker_amount = params['taker_amount']
+            taker_amount = int(params['taker_amount'], 16)
+            Logger.warning("\n create_irc2_swap =====>>>> %s %d %s %s %d" % (maker_contract, maker_amount, maker_address, taker_contract, taker_amount))
             self._create_swap(maker_contract, maker_amount, taker_contract, taker_amount, maker_address)
 
         elif params['action'] == 'fill_irc2_order':
             taker_contract = self.msg.sender
             taker_amount = _value
             taker_address = _from
-            swap_id = params['swap_id']
+            swap_id = int(params['swap_id'], 16)
+            Logger.warning("\n fill_irc2_order =====>>>> %s %d %s %d" % (taker_contract, taker_amount, taker_address, swap_id))
             self._fill_swap(swap_id, taker_contract, taker_amount, taker_address)
 
         else:
