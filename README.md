@@ -17,8 +17,6 @@ For doing so, this service implements a simple **[Atomic swap](https://en.bitcoi
 
 It is an alternative to the [Over-The-Counter](https://www.investopedia.com/terms/o/otc.asp) (OTC) trading method taking place on few unlisted tokens on ICON. This method is insecure as the trade isn't atomic.
 
-Please note that **ICONSwap is not a marketplace** : there is no book order, no automatic orders filling ; the ICONists need to find someone else interested in trading its tokens with in other channels.
-
 Alternatively, ICONSwap may be used by other SCORE developers willing to implement an atomic swap in their contract : the ICONSwap SCORE contract may be called from another SCORE.
 
 
