@@ -149,3 +149,11 @@ class SwapComposite(Composite):
     @staticmethod
     def pending(swap: Swap) -> bool:
         return swap._status.get() == SwapStatus.PENDING
+
+    @staticmethod
+    def open_orders_by_address(swap: Swap, address: Address) -> bool:
+        return swap._status.get() == SwapStatus.PENDING and swap._maker_address.get() == address
+
+    @staticmethod
+    def open_orders(swap: Swap) -> bool:
+        return swap._status.get() == SwapStatus.PENDING

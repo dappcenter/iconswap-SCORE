@@ -297,6 +297,16 @@ class ICONSwap(IconScoreBase):
 
     @catch_error
     @external(readonly=True)
+    def get_open_orders_by_address(self, address: Address) -> dict:
+        return SwapComposite(self.db).serialize(self.db, Swap, SwapComposite.open_orders_by_address, address)
+
+    @catch_error
+    @external(readonly=True)
+    def get_all_open_orders(self) -> dict:
+        return SwapComposite(self.db).serialize(self.db, Swap, SwapComposite.open_orders)
+
+    @catch_error
+    @external(readonly=True)
     def get_pending_swaps(self) -> dict:
         return SwapComposite(self.db).serialize(self.db, Swap, SwapComposite.pending)
 
