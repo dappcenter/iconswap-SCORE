@@ -84,7 +84,6 @@ class ICONSwap(IconScoreBase):
             irc2.transfer(dest, order.amount())
 
     def _refund_order(self, order: Order) -> None:
-        Logger.warning('\n   === _refund_order(%d => %s)' % (order.amount(), order.provider()))
         self._transfer_order(order, order.provider())
         order.empty()
 
@@ -102,8 +101,6 @@ class ICONSwap(IconScoreBase):
             taker_address: The address of the account providing the funds. If an error occurs
                       or if the trade isn't opened anymore, the funds will be sent back to this address
         """
-        Logger.warning('\n   === _fill_swap(%d, %s, %d, %s)' % (swap_id, taker_contract, taker_amount, taker_address), TAG)
-
         # Check if swap exists
         SwapComposite(self.db).check_exists(swap_id)
         swap = Swap(self.db, swap_id)
@@ -132,8 +129,6 @@ class ICONSwap(IconScoreBase):
         self._do_swap(swap_id)
 
     def _do_swap(self, swap_id: int) -> None:
-        Logger.warning('\n   === do_swap(%d)' % swap_id, TAG)
-
         # Check if swap exists
         SwapComposite(self.db).check_exists(swap_id)
         swap = Swap(self.db, swap_id)
@@ -178,8 +173,6 @@ class ICONSwap(IconScoreBase):
                      taker_contract: Address,
                      taker_amount: int,
                      maker_address: Address) -> None:
-        Logger.warning('\n   === create_swap(%s, %d, %s, %d)' % (maker_contract, maker_amount, taker_contract, taker_amount), TAG)
-
         self._check_contract(maker_contract)
         self._check_contract(taker_contract)
         self._check_amount(maker_amount)
@@ -202,8 +195,6 @@ class ICONSwap(IconScoreBase):
     @catch_error
     @external
     def tokenFallback(self, _from: Address, _value: int, _data: bytes) -> None:
-        Logger.warning('\n   === tokenFallback(%s, %d)' % (str(_from), _value), TAG)
-
         if _data is None or _data == b'None':
             raise InvalidTokenFallbackParams
 
@@ -215,7 +206,6 @@ class ICONSwap(IconScoreBase):
             maker_address = _from
             taker_contract = Address.from_string(params['taker_contract'])
             taker_amount = int(params['taker_amount'], 16)
-            Logger.warning("\n create_irc2_swap =====>>>> %s %d %s %s %d" % (maker_contract, maker_amount, maker_address, taker_contract, taker_amount))
             self._create_swap(maker_contract, maker_amount, taker_contract, taker_amount, maker_address)
 
         elif params['action'] == 'fill_irc2_order':
@@ -223,7 +213,6 @@ class ICONSwap(IconScoreBase):
             taker_amount = _value
             taker_address = _from
             swap_id = int(params['swap_id'], 16)
-            Logger.warning("\n fill_irc2_order =====>>>> %s %d %s %d" % (taker_contract, taker_amount, taker_address, swap_id))
             self._fill_swap(swap_id, taker_contract, taker_amount, taker_address)
 
         else:
@@ -233,7 +222,6 @@ class ICONSwap(IconScoreBase):
     @external
     @payable
     def create_icx_swap(self, taker_contract: Address, taker_amount: int) -> None:
-        Logger.warning('\n   === create_icx_swap(%s, %d)' % (taker_contract, taker_amount), TAG)
         maker_address = self.msg.sender
         maker_amount = self.msg.value
         self._create_swap(ZERO_SCORE_ADDRESS, maker_amount, taker_contract, taker_amount, maker_address)
@@ -241,8 +229,6 @@ class ICONSwap(IconScoreBase):
     @catch_error
     @external
     def cancel_swap(self, swap_id: int) -> None:
-        Logger.warning('\n   === cancel_swap(%d)' % swap_id)
-
         # Check if swap exists
         SwapComposite(self.db).check_exists(swap_id)
         swap = Swap(self.db, swap_id)
@@ -278,7 +264,6 @@ class ICONSwap(IconScoreBase):
     @external
     @payable
     def fill_icx_order(self, swap_id: int) -> None:
-        Logger.warning('\n   === fill_icx_order(%d)' % swap_id, TAG)
         taker_amount = self.msg.value
         taker_address = self.msg.sender
         self._fill_swap(swap_id, ZERO_SCORE_ADDRESS, taker_amount, taker_address)
@@ -297,18 +282,23 @@ class ICONSwap(IconScoreBase):
 
     @catch_error
     @external(readonly=True)
-    def get_open_orders_by_address(self, address: Address) -> dict:
-        return SwapComposite(self.db).serialize(self.db, Swap, SwapComposite.open_orders_by_address, address)
+    def get_opened_orders_by_address(self, address: Address, offset: int) -> dict:
+        return SwapComposite(self.db).serialize(self.db, offset, Swap, SwapComposite.opened_orders_by_address, address)
 
     @catch_error
     @external(readonly=True)
-    def get_all_open_orders(self) -> dict:
-        return SwapComposite(self.db).serialize(self.db, Swap, SwapComposite.open_orders)
+    def get_filled_orders_by_address(self, address: Address, offset: int) -> dict:
+        return SwapComposite(self.db).serialize(self.db, offset, Swap, SwapComposite.filled_orders_by_address, address)
 
     @catch_error
     @external(readonly=True)
-    def get_pending_swaps(self) -> dict:
-        return SwapComposite(self.db).serialize(self.db, Swap, SwapComposite.pending)
+    def get_all_open_orders(self, offset: int) -> dict:
+        return SwapComposite(self.db).serialize(self.db, offset, Swap, SwapComposite.open_orders)
+
+    @catch_error
+    @external(readonly=True)
+    def get_pending_swaps(self, offset: int) -> dict:
+        return SwapComposite(self.db).serialize(self.db, offset, Swap, SwapComposite.pending)
 
     @catch_error
     @external(readonly=True)

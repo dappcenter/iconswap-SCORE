@@ -101,7 +101,6 @@ class Order(object):
     #  Checks
     # ================================================
     def check_status(self, status: int) -> None:
-        Logger.warning('\n   === check_status(%d) => %d' % (status, self._status.get()), TAG)
         if self._status.get() != status:
             raise InvalidOrderStatus
 

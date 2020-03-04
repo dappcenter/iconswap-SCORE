@@ -128,7 +128,7 @@ class Swap(object):
             'status': Utils.enum_names(SwapStatus)[self._status.get()],
             'timestamp': self._timestamp.get(),
             'maker_address': self._maker_address.get(),
-            'transaction': self._transaction.get() or ''
+            'transaction': self._transaction.get()
         }
 
     def delete(self) -> None:
@@ -151,8 +151,12 @@ class SwapComposite(Composite):
         return swap._status.get() == SwapStatus.PENDING
 
     @staticmethod
-    def open_orders_by_address(swap: Swap, address: Address) -> bool:
+    def opened_orders_by_address(swap: Swap, address: Address) -> bool:
         return swap._status.get() == SwapStatus.PENDING and swap._maker_address.get() == address
+
+    @staticmethod
+    def filled_orders_by_address(swap: Swap, address: Address) -> bool:
+        return swap._status.get() == SwapStatus.SUCCESS and swap._maker_address.get() == address
 
     @staticmethod
     def open_orders(swap: Swap) -> bool:

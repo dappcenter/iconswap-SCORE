@@ -52,3 +52,11 @@ class IterableDictDB(object):
     def items(self):
         for key in self._keys:
             yield key, self._values[key]
+
+    def keys(self):
+        for key in self._keys:
+            yield key
+
+    def values(self):
+        for key in self._keys:
+            yield self._values[key]

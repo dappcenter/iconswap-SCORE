@@ -7,13 +7,12 @@
         "nonce": "0x0",
         "to": "xxx",
         "dataType": "call",
+        "value": "",
         "data": {
-            "method": "create_swap",
+            "method": "create_icx_swap",
             "params": {
-                "contract1": "",
-                "contract2": "",
-                "amount1": "",
-                "amount2": ""
+                "taker_contract": "",
+                "taker_amount": ""
             }
         }
     },

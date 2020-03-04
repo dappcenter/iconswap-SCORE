@@ -16,6 +16,7 @@
 
 from iconservice import *
 from .iterable_dict_db import *
+from .consts import *
 
 
 class ItemAlreadyExists(Exception):
@@ -64,8 +65,31 @@ class Composite:
         self.check_exists(item)
         del self._idb[item]
 
-    def serialize(self, db: IconScoreDatabase, objtype: type, cond=None, *args) -> dict:
-        objs = {k: objtype(db, v) for k, v in self._idb.items()}
-        if cond:
-            objs = dict(filter(lambda t: cond(t[1], *args), objs.items()))
-        return {k: v.serialize() for k, v in objs.items()}
+    def serialize(self, db: IconScoreDatabase, offset: int, objtype: type, cond=None, *args) -> dict:
+        items = self.items()
+        result = []
+
+        # Skip N items until offset
+        try:
+            for _ in range(offset):
+                next(items)
+        except StopIteration:
+            # Offset is bigger than the size of the collection
+            return {}
+
+        # Do a maximum iteration of MAX_ITERATION_LOOP
+        for _ in range(MAX_ITERATION_LOOP):
+            try:
+                item = next(items)
+                key = item[0]
+                obj = objtype(db, item[1])
+                if cond:
+                    if cond(obj, *args):
+                        result.append((key, obj))
+                else:
+                    result.append((key, obj))
+            except StopIteration:
+                # End of array : stop here
+                break
+
+        return {k: v.serialize() for k, v in result}
