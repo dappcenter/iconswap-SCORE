@@ -99,10 +99,10 @@ class ICONSwap(IconScoreBase):
             taker_amount: The amount of token traded.
                     It needs to match exactly the taker order amount or it will fail.
             taker_address: The address of the account providing the funds. If an error occurs
-                      or if the trade isn't opened anymore, the funds will be sent back to this address
+                      or if the trade isn't pending anymore, the funds will be sent back to this address
         """
         # Check if swap exists
-        SwapComposite(self.db).check_exists(swap_id)
+        AllSwapComposite(self.db).check_exists(swap_id)
         swap = Swap(self.db, swap_id)
 
         # Check if the swap is pending
@@ -130,7 +130,7 @@ class ICONSwap(IconScoreBase):
 
     def _do_swap(self, swap_id: int) -> None:
         # Check if swap exists
-        SwapComposite(self.db).check_exists(swap_id)
+        AllSwapComposite(self.db).check_exists(swap_id)
         swap = Swap(self.db, swap_id)
 
         # Check if the swap is pending
@@ -149,8 +149,15 @@ class ICONSwap(IconScoreBase):
         self.OrderTransferedEvent(maker_id, maker.contract(), maker.amount(), taker.provider())
         self.OrderTransferedEvent(taker_id, taker.contract(), taker.amount(), maker.provider())
 
+        # Set the swap as successful
         swap.set_status(SwapStatus.SUCCESS)
         swap.set_transaction(self.tx.hash.hex())
+        swap.set_timestamp_swap(self.now())
+        # Remove the swap from the pending list to the filled list
+        PendingSwapAccountComposite(self.db, maker.provider()).remove(swap_id)
+        FilledSwapAccountComposite(self.db, maker.provider()).add(swap_id)
+        FilledSwapAccountComposite(self.db, taker.provider()).add(swap_id)
+        # Set the orders as successful
         maker.set_status(OrderStatus.SUCCESS)
         taker.set_status(OrderStatus.SUCCESS)
         self.SwapSuccessEvent(swap_id)
@@ -230,7 +237,7 @@ class ICONSwap(IconScoreBase):
     @external
     def cancel_swap(self, swap_id: int) -> None:
         # Check if swap exists
-        SwapComposite(self.db).check_exists(swap_id)
+        AllSwapComposite(self.db).check_exists(swap_id)
         swap = Swap(self.db, swap_id)
 
         # Only the maker can cancel the swap
@@ -256,6 +263,9 @@ class ICONSwap(IconScoreBase):
         # Set the swap status as unavailable
         swap.set_status(SwapStatus.CANCELLED)
         swap.set_transaction(self.tx.hash.hex())
+        PendingSwapAccountComposite(self.db, swap.maker_address()).remove(swap_id)
+
+        # Set the orders as unavailable
         maker.set_status(OrderStatus.CANCELLED)
         taker.set_status(OrderStatus.CANCELLED)
         self.SwapCancelledEvent(swap_id)
@@ -271,7 +281,7 @@ class ICONSwap(IconScoreBase):
     @catch_error
     @external(readonly=True)
     def get_swap(self, swap_id: int) -> dict:
-        SwapComposite(self.db).check_exists(swap_id)
+        AllSwapComposite(self.db).check_exists(swap_id)
         return Swap(self.db, swap_id).serialize()
 
     @catch_error
@@ -282,23 +292,28 @@ class ICONSwap(IconScoreBase):
 
     @catch_error
     @external(readonly=True)
-    def get_opened_orders_by_address(self, address: Address, offset: int) -> dict:
-        return SwapComposite(self.db).serialize(self.db, offset, Swap, SwapComposite.opened_orders_by_address, address)
+    def get_pending_orders_by_address(self, address: Address, offset: int) -> dict:
+        return PendingSwapAccountComposite(self.db, address).serialize(self.db, offset, Swap)
 
     @catch_error
     @external(readonly=True)
     def get_filled_orders_by_address(self, address: Address, offset: int) -> dict:
-        return SwapComposite(self.db).serialize(self.db, offset, Swap, SwapComposite.filled_orders_by_address, address)
+        return FilledSwapAccountComposite(self.db, address).serialize(self.db, offset, Swap)
 
+    """
+    ##########################################
+    # Implementation expected in ICONSwap v2 #
+    ##########################################
     @catch_error
     @external(readonly=True)
     def get_all_open_orders(self, offset: int) -> dict:
-        return SwapComposite(self.db).serialize(self.db, offset, Swap, SwapComposite.open_orders)
+        pass
 
     @catch_error
     @external(readonly=True)
     def get_pending_swaps(self, offset: int) -> dict:
-        return SwapComposite(self.db).serialize(self.db, offset, Swap, SwapComposite.pending)
+        pass
+    """
 
     @catch_error
     @external(readonly=True)

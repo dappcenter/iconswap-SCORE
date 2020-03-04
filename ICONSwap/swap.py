@@ -57,11 +57,13 @@ class SwapFactory(Factory):
         item = Swap(db, uid)
         item._maker_order_id.set(maker_order_id)
         item._taker_order_id.set(taker_order_id)
-        item._timestamp.set(timestamp)
+        item._timestamp_create.set(timestamp)
+        item._timestamp_swap.set(0)
         item._maker_address.set(maker_address)
         item._status.set(SwapStatus.PENDING)
         item._transaction.set('')
-        SwapComposite(db).add(uid)
+        AllSwapComposite(db).add(uid)
+        PendingSwapAccountComposite(db, maker_address).add(uid)
 
         return uid
 
@@ -80,7 +82,8 @@ class Swap(object):
     _TAKER_ORDER_ID = 'SWAP_TAKER_ORDER_ID'
     _MAKER_ADDRESS = 'SWAP_MAKER_ADDRESS'
     _STATUS = 'SWAP_STATUS'
-    _TIMESTAMP = 'SWAP_TIMESTAMP'
+    _TIMESTAMP_CREATE = 'SWAP_TIMESTAMP_CREATE'
+    _TIMESTAMP_SWAP = 'SWAP_TIMESTAMP_SWAP'
     _TRANSACTION = 'SWAP_TRANSACTION'
 
     # ================================================
@@ -91,7 +94,8 @@ class Swap(object):
         self._taker_order_id = VarDB(f'{Swap._TAKER_ORDER_ID}_{uid}', db, value_type=int)
         self._maker_address = VarDB(f'{Swap._MAKER_ADDRESS}_{uid}', db, value_type=Address)
         self._status = VarDB(f'{Swap._STATUS}_{uid}', db, value_type=int)
-        self._timestamp = VarDB(f'{Swap._TIMESTAMP}_{uid}', db, value_type=int)
+        self._timestamp_create = VarDB(f'{Swap._TIMESTAMP_CREATE}_{uid}', db, value_type=int)
+        self._timestamp_swap = VarDB(f'{Swap._TIMESTAMP_SWAP}_{uid}', db, value_type=int)
         self._transaction = VarDB(f'{Swap._TRANSACTION}_{uid}', db, value_type=str)
 
     # ================================================
@@ -117,16 +121,23 @@ class Swap(object):
 
     def set_transaction(self, transaction: str) -> None:
         self._transaction.set(transaction)
+    
+    def set_timestamp_swap(self, time: int) -> None:
+        self._timestamp_swap.set(time)
 
     def get_orders(self) -> tuple:
         return (self._maker_order_id.get(), self._taker_order_id.get())
+
+    def maker_address(self) -> Address:
+        return self._maker_address.get()
 
     def serialize(self) -> dict:
         return {
             'maker_order_id': self._maker_order_id.get(),
             'taker_order_id': self._taker_order_id.get(),
             'status': Utils.enum_names(SwapStatus)[self._status.get()],
-            'timestamp': self._timestamp.get(),
+            'timestamp_create': self._timestamp_create.get(),
+            'timestamp_swap': self._timestamp_swap.get(),
             'maker_address': self._maker_address.get(),
             'transaction': self._transaction.get()
         }
@@ -135,29 +146,26 @@ class Swap(object):
         self._maker_order_id.remove()
         self._taker_order_id.remove()
         self._status.remove()
-        self._timestamp.remove()
+        self._timestamp_create.remove()
+        self._timestamp_swap.remove()
         self._maker_address.remove()
         self._transaction.remove()
 
 
-class SwapComposite(Composite):
+class AllSwapComposite(Composite):
     _NAME = 'SWAP_COMPOSITE'
 
     def __init__(self, db: IconScoreDatabase):
-        super().__init__(db, SwapComposite._NAME, int)
+        super().__init__(db, AllSwapComposite._NAME, int)
 
-    @staticmethod
-    def pending(swap: Swap) -> bool:
-        return swap._status.get() == SwapStatus.PENDING
+class PendingSwapAccountComposite(Composite):
+    _NAME = 'PENDING_SWAP_ACCOUNT_COMPOSITE'
 
-    @staticmethod
-    def opened_orders_by_address(swap: Swap, address: Address) -> bool:
-        return swap._status.get() == SwapStatus.PENDING and swap._maker_address.get() == address
+    def __init__(self, db: IconScoreDatabase, address: Address):
+        super().__init__(db, str(address) + '_' + PendingSwapAccountComposite._NAME, int)
 
-    @staticmethod
-    def filled_orders_by_address(swap: Swap, address: Address) -> bool:
-        return swap._status.get() == SwapStatus.SUCCESS and swap._maker_address.get() == address
+class FilledSwapAccountComposite(Composite):
+    _NAME = 'FILLED_SWAP_ACCOUNT_COMPOSITE'
 
-    @staticmethod
-    def open_orders(swap: Swap) -> bool:
-        return swap._status.get() == SwapStatus.PENDING
+    def __init__(self, db: IconScoreDatabase, address: Address):
+        super().__init__(db, str(address) + '_' + FilledSwapAccountComposite._NAME, int)

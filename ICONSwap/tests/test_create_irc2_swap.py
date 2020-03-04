@@ -149,7 +149,7 @@ class TestICONSwap(IconIntegrateTestBase):
         result = self._transfer_irc2_success(self._operator, 100, {
             'action': 'create_irc2_swap',
             'taker_contract': ICX_CONTRACT,
-            'taker_amount' : 200
+            'taker_amount' : "%#x" % 200
         })
 
         indexed = result['eventLogs'][0]['indexed']
@@ -161,7 +161,7 @@ class TestICONSwap(IconIntegrateTestBase):
         result = self._transfer_irc2_error(self._operator, 100, {
             'action': 'create_irc2_swap',
             'taker_contract': ICX_CONTRACT,
-            'taker_amount' : 200
+            'taker_amount' : "%#x" % 200
         })
 
         self.assertEqual(result['failure']['message'], "ItemDoesntExist('WHITELIST_COMPOSITE', '%s')" % self._irc2_address)
@@ -174,7 +174,7 @@ class TestICONSwap(IconIntegrateTestBase):
         result = self._transfer_irc2_error(self._operator, 0, {
             'action': 'create_irc2_swap',
             'taker_contract': ICX_CONTRACT,
-            'taker_amount': 200
+            'taker_amount': "%#x" % 200
         })
         self.assertEqual(result['failure']['message'], 'InvalidOrderAmount()')
 
@@ -182,7 +182,7 @@ class TestICONSwap(IconIntegrateTestBase):
         result = self._transfer_irc2_error(self._operator, 100, {
             'action': 'create_irc2_swap',
             'taker_contract': ICX_CONTRACT,
-            'taker_amount': 0
+            'taker_amount': "%#x" % 0
         })
 
         self.assertEqual(result['failure']['message'], 'InvalidOrderAmount()')
@@ -195,7 +195,7 @@ class TestICONSwap(IconIntegrateTestBase):
         result = self._transfer_irc2_error(self._operator, 100, {
             'action': 'create_irc2_swap',
             'taker_contract': 'hx0000000000000000000000000000000000000000',
-            'taker_amount': 0
+            'taker_amount': "%#x" % 0
         })
         self.assertEqual(result['failure']['message'], 'InvalidOrderContract()')
 
@@ -203,6 +203,6 @@ class TestICONSwap(IconIntegrateTestBase):
         result = self._transfer_irc2_error(self._operator, 100, {
             'action': 'create_irc2_swap',
             'taker_contract': '123',
-            'taker_amount': 0
+            'taker_amount': "%#x" % 0
         })
         self.assertEqual(result['failure']['message'], 'Invalid address')

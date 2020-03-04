@@ -169,7 +169,7 @@ class TestICONSwap(IconIntegrateTestBase):
         swap_id, maker_id, taker_id = self._create_icx_swap()
         result = self._transfer_irc2_success (self._user, 200, {
             'action': 'fill_irc2_order',
-            'swap_id': swap_id
+            'swap_id': "%#x" % swap_id
         })
 
         # Check trade
@@ -195,7 +195,7 @@ class TestICONSwap(IconIntegrateTestBase):
         swap_id, maker_id, taker_id = self._create_icx_swap()
         result = self._transfer_irc2_error (self._user, 123, {
             'action': 'fill_irc2_order',
-            'swap_id': swap_id
+            'swap_id': "%#x" % swap_id
         })
         self.assertEqual(result['failure']['message'], "InvalidOrderContent()")
 
@@ -205,7 +205,7 @@ class TestICONSwap(IconIntegrateTestBase):
         swap_id, maker_id, taker_id = self._create_icx_swap()
         params = {
             'action': 'fill_irc2_order',
-            'swap_id': swap_id
+            'swap_id': "%#x" % swap_id
         }
         result = transaction_call_error(
             super(),
@@ -227,12 +227,12 @@ class TestICONSwap(IconIntegrateTestBase):
         swap_id, maker_id, taker_id = self._create_icx_swap()
         result = self._transfer_irc2_success (self._user, 200, {
             'action': 'fill_irc2_order',
-            'swap_id': swap_id
+            'swap_id': "%#x" % swap_id
         })
 
         result = self._transfer_irc2_error (self._user, 200, {
             'action': 'fill_irc2_order',
-            'swap_id': swap_id
+            'swap_id': "%#x" % swap_id
         })
         self.assertEqual(result['failure']['message'], "InvalidSwapStatus()")
 
