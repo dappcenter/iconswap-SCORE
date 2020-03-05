@@ -162,18 +162,6 @@ class ICONSwap(IconScoreBase):
         taker.set_status(OrderStatus.SUCCESS)
         self.SwapSuccessEvent(swap_id)
 
-    # ================================================
-    #  Checks
-    # ================================================
-    def _check_amount(self, amount: int) -> None:
-        if amount == 0:
-            raise InvalidOrderAmount
-
-    def _check_contract(self, address: Address) -> None:
-        if not address.is_contract:
-            raise InvalidOrderContract
-        Whitelist(self.db).check_exists(address)
-
     def _create_swap(self,
                      maker_contract: Address,
                      maker_amount: int,
@@ -195,6 +183,18 @@ class ICONSwap(IconScoreBase):
         maker = Order(self.db, maker_id)
         maker.fill(maker_address)
         self.OrderFilledEvent(maker_id)
+
+    # ================================================
+    #  Checks
+    # ================================================
+    def _check_amount(self, amount: int) -> None:
+        if amount == 0:
+            raise InvalidOrderAmount
+
+    def _check_contract(self, address: Address) -> None:
+        if not address.is_contract:
+            raise InvalidOrderContract
+        Whitelist(self.db).check_exists(address)
 
     # ================================================
     #  External methods
@@ -299,21 +299,6 @@ class ICONSwap(IconScoreBase):
     @external(readonly=True)
     def get_filled_orders_by_address(self, address: Address, offset: int) -> dict:
         return FilledSwapAccountComposite(self.db, address).serialize(self.db, offset, Swap)
-
-    """
-    ##########################################
-    # Implementation expected in ICONSwap v2 #
-    ##########################################
-    @catch_error
-    @external(readonly=True)
-    def get_all_open_orders(self, offset: int) -> dict:
-        pass
-
-    @catch_error
-    @external(readonly=True)
-    def get_pending_swaps(self, offset: int) -> dict:
-        pass
-    """
 
     @catch_error
     @external(readonly=True)
