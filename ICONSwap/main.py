@@ -311,11 +311,11 @@ class ICONSwap(IconScoreBase):
     @catch_error
     @external
     @only_owner
-    def add_whitelist(self, contract: Address):
+    def add_whitelist(self, contract: Address) -> None:
         Whitelist(self.db).add(contract)
 
     @catch_error
     @external
     @only_owner
-    def remove_whitelist(self, contract: Address):
+    def remove_whitelist(self, contract: Address) -> None:
         Whitelist(self.db).remove(contract)

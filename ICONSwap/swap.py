@@ -153,7 +153,7 @@ class Swap(object):
 
 
 class AllSwapComposite(Composite):
-    _NAME = 'SWAP_COMPOSITE'
+    _NAME = 'ALL_SWAP_COMPOSITE'
 
     def __init__(self, db: IconScoreDatabase):
         super().__init__(db, AllSwapComposite._NAME, int)
