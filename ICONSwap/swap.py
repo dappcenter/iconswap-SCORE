@@ -121,7 +121,7 @@ class Swap(object):
 
     def set_transaction(self, transaction: str) -> None:
         self._transaction.set(transaction)
-    
+
     def set_timestamp_swap(self, time: int) -> None:
         self._timestamp_swap.set(time)
 
@@ -158,11 +158,13 @@ class AllSwapComposite(Composite):
     def __init__(self, db: IconScoreDatabase):
         super().__init__(db, AllSwapComposite._NAME, int)
 
+
 class PendingSwapAccountComposite(Composite):
     _NAME = 'PENDING_SWAP_ACCOUNT_COMPOSITE'
 
     def __init__(self, db: IconScoreDatabase, address: Address):
         super().__init__(db, str(address) + '_' + PendingSwapAccountComposite._NAME, int)
+
 
 class FilledSwapAccountComposite(Composite):
     _NAME = 'FILLED_SWAP_ACCOUNT_COMPOSITE'

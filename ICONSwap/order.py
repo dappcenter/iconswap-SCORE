@@ -69,11 +69,13 @@ class OrderComposite(Composite):
     def __init__(self, db: IconScoreDatabase):
         super().__init__(db, OrderComposite._NAME, int)
 
+
 class OrderStatus:
     EMPTY = 0
     FILLED = 1
     CANCELLED = 2
     SUCCESS = 3
+
 
 class Order(object):
     # ================================================

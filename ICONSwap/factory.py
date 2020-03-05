@@ -16,6 +16,7 @@
 
 from iconservice import *
 
+
 class Factory:
     # ================================================
     #  DB Variables
