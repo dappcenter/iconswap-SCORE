@@ -211,6 +211,30 @@ class ICONSwap(IconScoreBase):
     @catch_error
     @external
     def tokenFallback(self, _from: Address, _value: int, _data: bytes) -> None:
+        """
+            Create or fill a swap based on a IRC2 token
+
+            :param Address _from: 
+                When creating a swap, the maker address;
+                When filling a swap, the taker address
+            :param int _value:
+                The amount of token sent to the swap
+            :param bytes _data:
+                A UTF-8 encoded JSON string. It needs to follow the structure below:
+
+               Create IRC2 Swap:
+                {
+                    "action": "create_irc2_swap", 
+                    "taker_contract": The taker token contract address being traded with the current token
+                    "taker_amount": The amount of taker token required (hex encoded)
+                }
+
+                Fill IRC2 Taker Order:
+                {
+                    "action": "fill_irc2_order",
+                    "swap_id": The Swap ID being filled (hex encoded)
+                }
+        """
         if _data is None or _data == b'None':
             raise InvalidTokenFallbackParams
 
