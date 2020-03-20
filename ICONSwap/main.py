@@ -204,6 +204,10 @@ class ICONSwap(IconScoreBase):
     # ================================================
     #  External methods
     # ================================================
+    @payable
+    def fallback(self):
+        revert("ICONSwap contract doesn't accept direct ICX transfers")
+
     @catch_error
     @external
     def tokenFallback(self, _from: Address, _value: int, _data: bytes) -> None:
