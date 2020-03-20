@@ -52,6 +52,31 @@ def get_icx_balance(icon_integrate_test_base: IconIntegrateTestBase,
     # Sends the call request
     return response
 
+def irc2_transfer(icon_integrate_test_base: IconIntegrateTestBase, 
+    from_: Address, token: str, to_: str, value: int, icon_service: IconService = None):
+    return transaction_call_success(
+        icon_integrate_test_base,
+        from_=from_,
+        to_=token,
+        method="transfer",
+        params={
+            '_to': to_, 
+            '_value': value
+        },
+        icon_service=icon_service
+    )
+
+def get_irc2_balance(icon_integrate_test_base: IconIntegrateTestBase,
+                    address: str, token: str,
+                    icon_service: IconService = None) -> str:
+    return icx_call(
+                icon_integrate_test_base,
+                from_=address,
+                to_=token,
+                method="balanceOf",
+                params={'_owner': address},
+                icon_service=icon_service
+            )
 
 def deploy_score(icon_integrate_test_base: IconIntegrateTestBase,
                  content_as_bytes: bytes,

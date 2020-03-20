@@ -57,11 +57,13 @@ class TestICONSwap(IconIntegrateTestBase):
         self._user_icx_balance = get_icx_balance(super(), address=self._user.get_address(), icon_service=self.icon_service)
         self._irc2_address = self._deploy_irc2(self.IRC2_PROJECT)['scoreAddress']
         self._irc2_address_2 = self._deploy_irc2(self.IRC2_PROJECT)['scoreAddress']
-        
+
         irc2_transfer(super(), from_=self._operator, token=self._irc2_address, to_=self._user.get_address(), value=0x1000000, icon_service=self.icon_service)
         irc2_transfer(super(), from_=self._operator, token=self._irc2_address_2, to_=self._user.get_address(), value=0x1000000, icon_service=self.icon_service)
         self._operator_irc2_balance = get_irc2_balance(super(), address=self._operator.get_address(), token=self._irc2_address, icon_service=self.icon_service)
         self._user_irc2_balance = get_irc2_balance(super(), address=self._user.get_address(), token=self._irc2_address, icon_service=self.icon_service)
+        self._operator_irc2_balance_2 = get_irc2_balance(super(), address=self._operator.get_address(), token=self._irc2_address_2, icon_service=self.icon_service)
+        self._user_irc2_balance_2 = get_irc2_balance(super(), address=self._user.get_address(), token=self._irc2_address_2, icon_service=self.icon_service)
 
     def _deploy_score(self, project, to: str = SCORE_INSTALL_ADDRESS) -> dict:
         # Generates an instance of transaction for deploying SCORE.
@@ -130,55 +132,6 @@ class TestICONSwap(IconIntegrateTestBase):
             icon_service=self.icon_service
         )
 
-    def _create_icx_irc2_swap(self):
-        self._add_whitelist(ICX_CONTRACT)
-        self._add_whitelist(self._irc2_address)
-        # OK
-        result = transaction_call_success(
-            super(),
-            from_=self._operator,
-            to_=self._score_address,
-            method="create_icx_swap",
-            params={
-                'taker_contract': self._irc2_address,
-                'taker_amount': 200
-            },
-            value=100,
-            icon_service=self.icon_service
-        )
-
-        indexed = result['eventLogs'][0]['indexed']
-        self.assertEqual(indexed[0], 'SwapCreatedEvent(int,int,int)')
-        swap_id = int(indexed[1], 16)
-        maker_id, taker_id = map(lambda x: int(x, 16), result['eventLogs'][0]['data'])
-        return swap_id, maker_id, taker_id
-
-    def _create_irc2_icx_swap(self):
-        self._add_whitelist(ICX_CONTRACT)
-        self._add_whitelist(self._irc2_address)
-        # OK
-        result = transaction_call_success(
-            super(),
-            from_=self._operator,
-            to_=self._irc2_address,
-            method="transfer",
-            params={
-                '_to': self._score_address, 
-                '_value': 100,
-                '_data': json.dumps({
-                    "action": "create_irc2_swap",
-                    "taker_contract": ICX_CONTRACT,
-                    "taker_amount": hex(200),
-                }).encode('utf-8')},
-            icon_service=self.icon_service
-        )
-
-        indexed = result['eventLogs'][0]['indexed']
-        self.assertEqual(indexed[0], 'SwapCreatedEvent(int,int,int)')
-        swap_id = int(indexed[1], 16)
-        maker_id, taker_id = map(lambda x: int(x, 16), result['eventLogs'][0]['data'])
-        return swap_id, maker_id, taker_id
-
     def _create_irc2_irc2_swap(self):
         self._add_whitelist(self._irc2_address)
         self._add_whitelist(self._irc2_address_2)
@@ -205,16 +158,6 @@ class TestICONSwap(IconIntegrateTestBase):
         maker_id, taker_id = map(lambda x: int(x, 16), result['eventLogs'][0]['data'])
         return swap_id, maker_id, taker_id
 
-    def _fill_icx_order(self, _from, swap_id, amount):
-        result = transaction_call_success(
-            super(),
-            from_=_from,
-            to_=self._score_address,
-            method="fill_icx_order",
-            params={'swap_id': swap_id},
-            value=amount,
-            icon_service=self.icon_service
-        )
 
     def _fill_irc2_order(self, call, _from, to_, swap_id, amount):
         return call(
@@ -239,136 +182,19 @@ class TestICONSwap(IconIntegrateTestBase):
         return self._fill_irc2_order(transaction_call_error, _from, to_, swap_id, amount)
 
     # ===============================================================
-    def test_cancel_swap_icx_irc2_ok(self):
-        swap_id, maker_id, taker_id = self._create_icx_irc2_swap()
-
-        # OK
-        result = transaction_call_success(
-            super(),
-            from_=self._operator,
-            to_=self._score_address,
-            method="cancel_swap",
-            params={"swap_id": swap_id},
-            icon_service=self.icon_service
-        )
-
-        # Check refund
-        operator_balance = get_icx_balance(super(), address=self._operator.get_address(), icon_service=self.icon_service)
-        user_balance = get_icx_balance(super(), address=self._user.get_address(), icon_service=self.icon_service)
-
-        # OK
-        self.assertEqual(operator_balance, self._operator_icx_balance)
-        self.assertEqual(user_balance, self._user_icx_balance)
-
-    def test_cancel_swap_irc2_icx_ok(self):
-        swap_id, maker_id, taker_id = self._create_irc2_icx_swap()
-
-        # OK
-        result = transaction_call_success(
-            super(),
-            from_=self._operator,
-            to_=self._score_address,
-            method="cancel_swap",
-            params={"swap_id": swap_id},
-            icon_service=self.icon_service
-        )
-
-        # Check refund
-        operator_balance = get_icx_balance(super(), address=self._operator.get_address(), icon_service=self.icon_service)
-        user_balance = get_icx_balance(super(), address=self._user.get_address(), icon_service=self.icon_service)
-
-        # OK
-        self.assertEqual(operator_balance, self._operator_icx_balance)
-        self.assertEqual(user_balance, self._user_icx_balance)
-
-    def test_cancel_swap_irc2_irc2_ok(self):
-        swap_id, maker_id, taker_id = self._create_irc2_irc2_swap()
-
-        # OK
-        result = transaction_call_success(
-            super(),
-            from_=self._operator,
-            to_=self._score_address,
-            method="cancel_swap",
-            params={"swap_id": swap_id},
-            icon_service=self.icon_service
-        )
-
-        # Check refund
-        operator_balance = get_irc2_balance(super(), self._operator.get_address(), self._irc2_address, self.icon_service)
-        user_balance = get_irc2_balance(super(), self._user.get_address(), self._irc2_address, self.icon_service)
-
-        # OK
-        self.assertEqual(operator_balance, self._operator_irc2_balance)
-        self.assertEqual(user_balance, self._user_irc2_balance)
-
-    def test_cancel_icx_irc2_swap_already_swapped(self):
-        swap_id, maker_id, taker_id = self._create_icx_irc2_swap()
-        self._fill_irc2_order_success(self._user, self._irc2_address, swap_id, 200)
-
-        # Error: already swapped
-        result = transaction_call_error(
-            super(),
-            from_=self._operator,
-            to_=self._score_address,
-            method="cancel_swap",
-            params={"swap_id": swap_id},
-            icon_service=self.icon_service
-        )
-        self.assertEqual(result['failure']['message'], 'InvalidSwapStatus()')
-
-    def test_cancel_irc2_icx_swap_already_swapped(self):
-        swap_id, maker_id, taker_id = self._create_irc2_icx_swap()
-        self._fill_icx_order(self._user, swap_id, 200)
-
-        # Error: already swapped
-        result = transaction_call_error(
-            super(),
-            from_=self._operator,
-            to_=self._score_address,
-            method="cancel_swap",
-            params={"swap_id": swap_id},
-            icon_service=self.icon_service
-        )
-        self.assertEqual(result['failure']['message'], 'InvalidSwapStatus()')
-
-    def test_cancel_irc2_irc2_swap_already_swapped(self):
+    def test_do_irc2_irc2_swap_ok(self):
         swap_id, maker_id, taker_id = self._create_irc2_irc2_swap()
         self._fill_irc2_order_success(self._user, self._irc2_address_2, swap_id, 200)
 
-        # Error: already swapped
-        result = transaction_call_error(
-            super(),
-            from_=self._operator,
-            to_=self._score_address,
-            method="cancel_swap",
-            params={"swap_id": swap_id},
-            icon_service=self.icon_service
-        )
-        self.assertEqual(result['failure']['message'], 'InvalidSwapStatus()')
+        # Check trade status
+        operator_irc2_balance = get_irc2_balance(super(), address=self._operator.get_address(), token=self._irc2_address, icon_service=self.icon_service)
+        user_irc2_balance = get_irc2_balance(super(), address=self._user.get_address(), token=self._irc2_address, icon_service=self.icon_service)
+        operator_irc2_balance_2 = get_irc2_balance(super(), address=self._operator.get_address(), token=self._irc2_address_2, icon_service=self.icon_service)
+        user_irc2_balance_2 = get_irc2_balance(super(), address=self._user.get_address(), token=self._irc2_address_2, icon_service=self.icon_service)
 
-    def test_cancel_swap_not_operator(self):
-        swap_id, maker_id, taker_id = self._create_icx_irc2_swap()
+        # OK
+        self.assertEqual(int(operator_irc2_balance, 16), int(self._operator_irc2_balance, 16) - 100)
+        self.assertEqual(int(operator_irc2_balance_2, 16), int(self._operator_irc2_balance_2, 16) + 200)
 
-        result = transaction_call_error(
-            super(),
-            from_=self._user,
-            to_=self._score_address,
-            method="cancel_swap",
-            params={"swap_id": swap_id},
-            icon_service=self.icon_service
-        )
-        self.assertEqual(result['failure']['message'], 'InvalidMakerAddress()')
-
-    def test_cancel_swap_attacker(self):
-        swap_id, maker_id, taker_id = self._create_icx_irc2_swap()
-
-        result = transaction_call_error(
-            super(),
-            from_=self._attacker,
-            to_=self._score_address,
-            method="cancel_swap",
-            params={"swap_id": swap_id},
-            icon_service=self.icon_service
-        )
-        self.assertEqual(result['failure']['message'], 'InvalidMakerAddress()')
+        self.assertEqual(int(user_irc2_balance, 16), int(self._user_irc2_balance, 16) + 100)
+        self.assertEqual(int(user_irc2_balance_2, 16), int(self._user_irc2_balance_2, 16) - 200)

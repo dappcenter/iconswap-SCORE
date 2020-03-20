@@ -131,36 +131,160 @@ class TestICONSwap(IconIntegrateTestBase):
         )
 
     # ===============================================================
-    def test_remove_whitelist_ok(self):
-        self._add_whitelist(ICX_CONTRACT)
+    def test_create_irc2_irc2_swap_ok(self):
+        self._add_whitelist(self._irc2_address)
+        self._add_whitelist(self._irc2_address_2)
+        
         # OK
         result = transaction_call_success(
             super(),
             from_=self._operator,
-            to_=self._score_address,
-            method="remove_whitelist",
-            params={'contract': ICX_CONTRACT},
+            to_=self._irc2_address,
+            method="transfer",
+            params={
+                '_to': self._score_address, 
+                '_value': 100,
+                '_data': json.dumps({
+                    "action": "create_irc2_swap",
+                    "taker_contract": self._irc2_address_2,
+                    "taker_amount": hex(200),
+                }).encode('utf-8')},
             icon_service=self.icon_service
         )
 
-        whitelist = icx_call(
-            super(),
-            from_=self._operator.get_address(),
-            to_=self._score_address,
-            method="get_whitelist",
-            icon_service=self.icon_service
-        )
+        indexed = result['eventLogs'][0]['indexed']
+        self.assertEqual(indexed[0], 'SwapCreatedEvent(int,int,int)')
 
-        self.assertTrue(len(whitelist) == 0)
+        # OK
+        operator_irc2_balance = get_irc2_balance(super(), address=self._operator.get_address(), token=self._irc2_address, icon_service=self.icon_service)
+        self.assertEqual(int(operator_irc2_balance, 16), int(self._operator_irc2_balance, 16) - 100)
 
-    def test_remove_whitelist_not_exists(self):
-        # Doesn't exist
+    def test_create_irc2_irc2_swap_not_whitelisted(self):
+        self._add_whitelist(self._irc2_address)
+        # self._irc2_address_2 is not whitelisted
+
         result = transaction_call_error(
             super(),
             from_=self._operator,
-            to_=self._score_address,
-            method="remove_whitelist",
-            params={'contract': ICX_CONTRACT},
+            to_=self._irc2_address,
+            method="transfer",
+            params={
+                '_to': self._score_address, 
+                '_value': 100,
+                '_data': json.dumps({
+                    "action": "create_irc2_swap",
+                    "taker_contract": self._irc2_address_2,
+                    "taker_amount": hex(200),
+                }).encode('utf-8')},
             icon_service=self.icon_service
         )
-        self.assertEqual(result['failure']['message'], f"ItemDoesntExist('WHITELIST_COMPOSITE', '{ICX_CONTRACT}')")
+        self.assertEqual(result['failure']['message'], "ItemDoesntExist('WHITELIST_COMPOSITE', '" + self._irc2_address_2 + "')")
+
+    def test_create_irc2_irc2_swap_not_whitelisted_2(self):
+        # self._irc2_address is not whitelisted
+        self._add_whitelist(self._irc2_address_2)
+
+        result = transaction_call_error(
+            super(),
+            from_=self._operator,
+            to_=self._irc2_address,
+            method="transfer",
+            params={
+                '_to': self._score_address, 
+                '_value': 100,
+                '_data': json.dumps({
+                    "action": "create_irc2_swap",
+                    "taker_contract": self._irc2_address_2,
+                    "taker_amount": hex(200),
+                }).encode('utf-8')},
+            icon_service=self.icon_service
+        )
+        self.assertEqual(result['failure']['message'], f"ItemDoesntExist('WHITELIST_COMPOSITE', '{self._irc2_address}')")
+
+    def test_create_irc2_irc2_swap_zero_amount(self):
+        self._add_whitelist(self._irc2_address)
+        self._add_whitelist(self._irc2_address_2)
+
+        # Amount cannot be zero
+        result = transaction_call_error(
+            super(),
+            from_=self._operator,
+            to_=self._irc2_address,
+            method="transfer",
+            params={
+                '_to': self._score_address, 
+                '_value': 0,
+                '_data': json.dumps({
+                    "action": "create_irc2_swap",
+                    "taker_contract": self._irc2_address_2,
+                    "taker_amount": hex(200),
+                }).encode('utf-8')},
+            icon_service=self.icon_service
+        )
+        self.assertEqual(result['failure']['message'], 'InvalidOrderAmount()')
+
+    def test_create_irc2_irc2_swap_zero_amount_2(self):
+        self._add_whitelist(self._irc2_address)
+        self._add_whitelist(self._irc2_address_2)
+
+        # Amount cannot be zero
+        result = transaction_call_error(
+            super(),
+            from_=self._operator,
+            to_=self._irc2_address,
+            method="transfer",
+            params={
+                '_to': self._score_address, 
+                '_value': 100,
+                '_data': json.dumps({
+                    "action": "create_irc2_swap",
+                    "taker_contract": self._irc2_address_2,
+                    "taker_amount": hex(0),
+                }).encode('utf-8')},
+            icon_service=self.icon_service
+        )
+        self.assertEqual(result['failure']['message'], 'InvalidOrderAmount()')
+
+    def test_create_irc2_irc2_swap_badaddr(self):
+        self._add_whitelist(self._irc2_address)
+        self._add_whitelist(self._irc2_address_2)
+
+        # "taker_contract" must be a contract
+        result = transaction_call_error(
+            super(),
+            from_=self._operator,
+            to_=self._irc2_address,
+            method="transfer",
+            params={
+                '_to': self._score_address, 
+                '_value': 100,
+                '_data': json.dumps({
+                    "action": "create_irc2_swap",
+                    "taker_contract": 'hx0000000000000000000000000000000000000000',
+                    "taker_amount": hex(200),
+                }).encode('utf-8')},
+            icon_service=self.icon_service
+        )
+        self.assertEqual(result['failure']['message'], 'InvalidOrderContract()')
+
+    def test_create_irc2_irc2_swap_badaddr_2(self):
+        self._add_whitelist(self._irc2_address)
+        self._add_whitelist(self._irc2_address_2)
+
+        # Contract must be a contract
+        result = transaction_call_error(
+            super(),
+            from_=self._operator,
+            to_=self._irc2_address,
+            method="transfer",
+            params={
+                '_to': self._score_address, 
+                '_value': 100,
+                '_data': json.dumps({
+                    "action": "create_irc2_swap",
+                    "taker_contract": '123',
+                    "taker_amount": hex(200),
+                }).encode('utf-8')},
+            icon_service=self.icon_service
+        )
+        self.assertEqual(result['failure']['message'], 'Invalid address')
