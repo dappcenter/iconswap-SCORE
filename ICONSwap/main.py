@@ -170,6 +170,7 @@ class ICONSwap(IconScoreBase):
                      maker_address: Address) -> None:
         self._check_contract(maker_contract)
         self._check_contract(taker_contract)
+        self._check_different_contract(maker_contract, taker_contract)
         self._check_amount(maker_amount)
         self._check_amount(taker_amount)
 
@@ -195,6 +196,10 @@ class ICONSwap(IconScoreBase):
         if not address.is_contract:
             raise InvalidOrderContract
         Whitelist(self.db).check_exists(address)
+
+    def _check_different_contract(self, contract1: Address, contract2: Address) -> None:
+        if contract1 == contract2:
+            raise InvalidOrderContract
 
     # ================================================
     #  External methods
