@@ -150,11 +150,10 @@ class TestICONSwap(IconIntegrateTestBase):
         )
         indexed = result['eventLogs'][0]['indexed']
         self.assertEqual(indexed[0], 'SwapCreatedEvent(int,int,int)')
-        
+
         # OK
         operator_icx_balance = get_icx_balance(super(), address=self._operator.get_address(), icon_service=self.icon_service)
         self.assertEqual(int(operator_icx_balance, 16), int(self._operator_icx_balance, 16) - 100)
-
 
     def test_create_icx_irc2_swap_not_whitelisted(self):
         self._add_whitelist(self._irc2_address)
@@ -172,7 +171,7 @@ class TestICONSwap(IconIntegrateTestBase):
             value=100,
             icon_service=self.icon_service
         )
-        self.assertEqual(result['failure']['message'], f"ItemDoesntExist('WHITELIST_COMPOSITE', '{ICX_CONTRACT}')")
+        self.assertEqual(result['failure']['message'], f"ItemNotFound('WHITELIST_SETDB', '{ICX_CONTRACT}')")
 
     def test_create_icx_irc2_swap_not_whitelisted_2(self):
         self._add_whitelist(ICX_CONTRACT)
@@ -190,7 +189,7 @@ class TestICONSwap(IconIntegrateTestBase):
             value=100,
             icon_service=self.icon_service
         )
-        self.assertEqual(result['failure']['message'], f"ItemDoesntExist('WHITELIST_COMPOSITE', '{self._irc2_address}')")
+        self.assertEqual(result['failure']['message'], f"ItemNotFound('WHITELIST_SETDB', '{self._irc2_address}')")
 
     def test_create_icx_irc2_swap_zero_amount(self):
         self._add_whitelist(ICX_CONTRACT)

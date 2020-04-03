@@ -136,6 +136,7 @@ class TestICONSwap(IconIntegrateTestBase):
             from_=self._operator.get_address(),
             to_=self._score_address,
             method="get_whitelist",
+            params={"offset": 0},
             icon_service=self.icon_service
         )
 
@@ -153,7 +154,7 @@ class TestICONSwap(IconIntegrateTestBase):
             icon_service=self.icon_service
         )
         # Already added
-        result = transaction_call_error(
+        result = transaction_call_success(
             super(),
             from_=self._operator,
             to_=self._score_address,
@@ -161,7 +162,16 @@ class TestICONSwap(IconIntegrateTestBase):
             params={'contract': ICX_CONTRACT},
             icon_service=self.icon_service
         )
-        self.assertEqual(result['failure']['message'], f"ItemAlreadyExists('WHITELIST_COMPOSITE', '{ICX_CONTRACT}')")
+        whitelist = icx_call(
+            super(),
+            from_=self._operator.get_address(),
+            to_=self._score_address,
+            method="get_whitelist",
+            params={"offset": 0},
+            icon_service=self.icon_service
+        )
+        self.assertTrue(len(whitelist) == 1)
+        self.assertTrue(whitelist[0] == Address.from_string(ICX_CONTRACT))
 
     def test_add_whitelist_not_contract(self):
         # OK
@@ -174,7 +184,6 @@ class TestICONSwap(IconIntegrateTestBase):
             icon_service=self.icon_service
         )
         self.assertEqual(result['failure']['message'], 'InvalidWhitelistContract()')
-
 
     def test_add_whitelist_not_operator(self):
         # OK

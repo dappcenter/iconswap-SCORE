@@ -134,7 +134,7 @@ class TestICONSwap(IconIntegrateTestBase):
     def test_create_irc2_irc2_swap_ok(self):
         self._add_whitelist(self._irc2_address)
         self._add_whitelist(self._irc2_address_2)
-        
+
         # OK
         result = transaction_call_success(
             super(),
@@ -142,7 +142,7 @@ class TestICONSwap(IconIntegrateTestBase):
             to_=self._irc2_address,
             method="transfer",
             params={
-                '_to': self._score_address, 
+                '_to': self._score_address,
                 '_value': 100,
                 '_data': json.dumps({
                     "action": "create_irc2_swap",
@@ -169,7 +169,7 @@ class TestICONSwap(IconIntegrateTestBase):
             to_=self._irc2_address,
             method="transfer",
             params={
-                '_to': self._score_address, 
+                '_to': self._score_address,
                 '_value': 100,
                 '_data': json.dumps({
                     "action": "create_irc2_swap",
@@ -178,7 +178,7 @@ class TestICONSwap(IconIntegrateTestBase):
                 }).encode('utf-8')},
             icon_service=self.icon_service
         )
-        self.assertEqual(result['failure']['message'], "ItemDoesntExist('WHITELIST_COMPOSITE', '" + self._irc2_address_2 + "')")
+        self.assertEqual(result['failure']['message'], "ItemNotFound('WHITELIST_SETDB', '" + self._irc2_address_2 + "')")
 
     def test_create_irc2_irc2_swap_not_whitelisted_2(self):
         # self._irc2_address is not whitelisted
@@ -190,7 +190,7 @@ class TestICONSwap(IconIntegrateTestBase):
             to_=self._irc2_address,
             method="transfer",
             params={
-                '_to': self._score_address, 
+                '_to': self._score_address,
                 '_value': 100,
                 '_data': json.dumps({
                     "action": "create_irc2_swap",
@@ -199,7 +199,7 @@ class TestICONSwap(IconIntegrateTestBase):
                 }).encode('utf-8')},
             icon_service=self.icon_service
         )
-        self.assertEqual(result['failure']['message'], f"ItemDoesntExist('WHITELIST_COMPOSITE', '{self._irc2_address}')")
+        self.assertEqual(result['failure']['message'], f"ItemNotFound('WHITELIST_SETDB', '{self._irc2_address}')")
 
     def test_create_irc2_irc2_swap_zero_amount(self):
         self._add_whitelist(self._irc2_address)
@@ -212,7 +212,7 @@ class TestICONSwap(IconIntegrateTestBase):
             to_=self._irc2_address,
             method="transfer",
             params={
-                '_to': self._score_address, 
+                '_to': self._score_address,
                 '_value': 0,
                 '_data': json.dumps({
                     "action": "create_irc2_swap",
@@ -234,7 +234,7 @@ class TestICONSwap(IconIntegrateTestBase):
             to_=self._irc2_address,
             method="transfer",
             params={
-                '_to': self._score_address, 
+                '_to': self._score_address,
                 '_value': 100,
                 '_data': json.dumps({
                     "action": "create_irc2_swap",
@@ -256,7 +256,7 @@ class TestICONSwap(IconIntegrateTestBase):
             to_=self._irc2_address,
             method="transfer",
             params={
-                '_to': self._score_address, 
+                '_to': self._score_address,
                 '_value': 100,
                 '_data': json.dumps({
                     "action": "create_irc2_swap",
@@ -278,7 +278,7 @@ class TestICONSwap(IconIntegrateTestBase):
             to_=self._irc2_address,
             method="transfer",
             params={
-                '_to': self._score_address, 
+                '_to': self._score_address,
                 '_value': 100,
                 '_data': json.dumps({
                     "action": "create_irc2_swap",

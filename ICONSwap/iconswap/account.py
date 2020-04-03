@@ -15,25 +15,22 @@
 # limitations under the License.
 
 from iconservice import *
-from .composite import *
-from .utils import *
 from .consts import *
+from ..scorelib.utils import *
+from ..scorelib.set import *
 
 
-class InvalidWhitelistContract(Exception):
-    pass
+class AccountPendingSwapDB(SetDB):
+    _NAME = 'ACCOUNT_PENDING_SWAP_DB'
+
+    def __init__(self, db: IconScoreDatabase, address: Address):
+        name = str(address) + '_' + AccountPendingSwapDB._NAME
+        super().__init__(name, db, int)
 
 
-class Whitelist(Composite):
-    _NAME = 'WHITELIST_COMPOSITE'
+class AccountFilledSwapDB(SetDB):
+    _NAME = 'ACCOUNT_FILLED_SWAP_DB'
 
-    def __init__(self, db: IconScoreDatabase):
-        super().__init__(db, Whitelist._NAME, Address)
-
-    def add(self, token: Address) -> None:
-        if not token.is_contract:
-            raise InvalidWhitelistContract
-        super().add(token)
-
-    def serialize(self) -> list:
-        return [k for k, v in self.items()]
+    def __init__(self, db: IconScoreDatabase, address: Address):
+        name = str(address) + '_' + AccountFilledSwapDB._NAME
+        super().__init__(name, db, int)

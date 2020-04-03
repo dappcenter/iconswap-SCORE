@@ -16,10 +16,7 @@
 
 from iconservice import *
 
-
 # ================================================
 #  Consts
 # ================================================
-TAG = 'ICONSwap'
-VERSION = '0.2.0'
-ZERO_SCORE_ADDRESS = Address.from_string('cx0000000000000000000000000000000000000000')
+MAX_ITERATION_LOOP = 100

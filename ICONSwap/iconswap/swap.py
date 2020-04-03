@@ -15,11 +15,9 @@
 # limitations under the License.
 
 from iconservice import *
-from .utils import *
-from .order import *
 from .consts import *
-from .composite import *
-from .factory import *
+from ..scorelib.id_factory import *
+from ..scorelib.utils import *
 
 # ================================================
 #  Exception
@@ -42,30 +40,32 @@ class SwapDoesntExist(Exception):
     pass
 
 
-class SwapFactory(Factory):
-    # ================================================
-    #  Methods
-    # ================================================
-    @staticmethod
-    def create(db: IconScoreDatabase,
-               maker_order_id: int,
+class SwapFactory(IdFactory):
+
+    _NAME = 'SWAP_FACTORY'
+
+    def __init__(self, db: IconScoreDatabase):
+        name = SwapFactory._NAME
+        super().__init__(name, db)
+        self._name = name
+        self._db = db
+
+    def create(self, maker_order_id: int,
                taker_order_id: int,
                timestamp: int,
                maker_address: Address) -> int:
 
-        uid = Factory.get_uid(db, 'SWAP')
-        item = Swap(db, uid)
-        item._maker_order_id.set(maker_order_id)
-        item._taker_order_id.set(taker_order_id)
-        item._timestamp_create.set(timestamp)
-        item._timestamp_swap.set(0)
-        item._maker_address.set(maker_address)
-        item._status.set(SwapStatus.PENDING)
-        item._transaction.set('')
-        AllSwapComposite(db).add(uid)
-        PendingSwapAccountComposite(db, maker_address).add(uid)
+        swap_id = self.get_uid()
+        swap = Swap(self._db, swap_id)
+        swap._maker_order_id.set(maker_order_id)
+        swap._taker_order_id.set(taker_order_id)
+        swap._timestamp_create.set(timestamp)
+        swap._timestamp_swap.set(0)
+        swap._maker_address.set(maker_address)
+        swap._status.set(SwapStatus.PENDING)
+        # swap._transaction.set('')
 
-        return uid
+        return swap_id
 
 
 class SwapStatus:
@@ -75,32 +75,22 @@ class SwapStatus:
 
 
 class Swap(object):
-    # ================================================
-    #  DB Variables
-    # ================================================
-    _MAKER_ORDER_ID = 'SWAP_MAKER_ORDER_ID'
-    _TAKER_ORDER_ID = 'SWAP_TAKER_ORDER_ID'
-    _MAKER_ADDRESS = 'SWAP_MAKER_ADDRESS'
-    _STATUS = 'SWAP_STATUS'
-    _TIMESTAMP_CREATE = 'SWAP_TIMESTAMP_CREATE'
-    _TIMESTAMP_SWAP = 'SWAP_TIMESTAMP_SWAP'
-    _TRANSACTION = 'SWAP_TRANSACTION'
+
+    _NAME = 'SWAP'
 
     # ================================================
     #  Initialization
     # ================================================
     def __init__(self, db: IconScoreDatabase, uid: int) -> None:
-        self._maker_order_id = VarDB(f'{Swap._MAKER_ORDER_ID}_{uid}', db, value_type=int)
-        self._taker_order_id = VarDB(f'{Swap._TAKER_ORDER_ID}_{uid}', db, value_type=int)
-        self._maker_address = VarDB(f'{Swap._MAKER_ADDRESS}_{uid}', db, value_type=Address)
-        self._status = VarDB(f'{Swap._STATUS}_{uid}', db, value_type=int)
-        self._timestamp_create = VarDB(f'{Swap._TIMESTAMP_CREATE}_{uid}', db, value_type=int)
-        self._timestamp_swap = VarDB(f'{Swap._TIMESTAMP_SWAP}_{uid}', db, value_type=int)
-        self._transaction = VarDB(f'{Swap._TRANSACTION}_{uid}', db, value_type=str)
-
-    # ================================================
-    #  Private Methods
-    # ================================================
+        self._name = Swap._NAME
+        self._maker_order_id = VarDB(f'{self._name}_MAKER_ORDER_ID_{uid}', db, value_type=int)
+        self._taker_order_id = VarDB(f'{self._name}_TAKER_ORDER_ID_{uid}', db, value_type=int)
+        self._maker_address = VarDB(f'{self._name}_MAKER_ADDRESS_{uid}', db, value_type=Address)
+        self._status = VarDB(f'{self._name}_STATUS_{uid}', db, value_type=int)
+        self._timestamp_create = VarDB(f'{self._name}_TIMESTAMP_CREATE_{uid}', db, value_type=int)
+        self._timestamp_swap = VarDB(f'{self._name}_TIMESTAMP_SWAP_{uid}', db, value_type=int)
+        self._transaction = VarDB(f'{self._name}_TRANSACTION_{uid}', db, value_type=str)
+        self._db = db
 
     # ================================================
     #  Checks
@@ -150,24 +140,3 @@ class Swap(object):
         self._timestamp_swap.remove()
         self._maker_address.remove()
         self._transaction.remove()
-
-
-class AllSwapComposite(Composite):
-    _NAME = 'ALL_SWAP_COMPOSITE'
-
-    def __init__(self, db: IconScoreDatabase):
-        super().__init__(db, AllSwapComposite._NAME, int)
-
-
-class PendingSwapAccountComposite(Composite):
-    _NAME = 'PENDING_SWAP_ACCOUNT_COMPOSITE'
-
-    def __init__(self, db: IconScoreDatabase, address: Address):
-        super().__init__(db, str(address) + '_' + PendingSwapAccountComposite._NAME, int)
-
-
-class FilledSwapAccountComposite(Composite):
-    _NAME = 'FILLED_SWAP_ACCOUNT_COMPOSITE'
-
-    def __init__(self, db: IconScoreDatabase, address: Address):
-        super().__init__(db, str(address) + '_' + FilledSwapAccountComposite._NAME, int)

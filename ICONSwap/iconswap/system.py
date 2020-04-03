@@ -14,12 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 from iconservice import *
+from ..scorelib.set import *
 
 
-# ================================================
-#  Consts
-# ================================================
-TAG = 'ICONSwap'
-VERSION = '0.2.0'
-ZERO_SCORE_ADDRESS = Address.from_string('cx0000000000000000000000000000000000000000')
+class SystemSwapDB(SetDB):
+    _NAME = 'SYSTEM_SWAP_DB'
+
+    def __init__(self, db: IconScoreDatabase):
+        super().__init__(SystemSwapDB._NAME, db, int)
+
+
+class SystemOrderDB(SetDB):
+    _NAME = 'SYSTEM_ORDER_DB'
+
+    def __init__(self, db: IconScoreDatabase):
+        super().__init__(SystemOrderDB._NAME, db, int)

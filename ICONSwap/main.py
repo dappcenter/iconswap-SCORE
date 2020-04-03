@@ -16,13 +16,15 @@
 
 from iconservice import *
 from .checks import *
-from .utils import *
 from .version import *
-from .swap import *
-from .order import *
-from .whitelist import *
-from .irc2_interface import *
 from .consts import *
+from .iconswap.system import *
+from .iconswap.market import *
+from .iconswap.account import *
+from .iconswap.swap import *
+from .iconswap.order import *
+from .iconswap.whitelist import *
+from .irc2.interface import *
 
 
 class InvalidTokenFallbackParams(Exception):
@@ -102,7 +104,7 @@ class ICONSwap(IconScoreBase):
                       or if the trade isn't pending anymore, the funds will be sent back to this address
         """
         # Check if swap exists
-        AllSwapComposite(self.db).check_exists(swap_id)
+        SystemSwapDB(self.db).check_exists(swap_id)
         swap = Swap(self.db, swap_id)
 
         # Check if the swap is pending
@@ -121,8 +123,12 @@ class ICONSwap(IconScoreBase):
         # Check taker order content
         taker.check_content(taker_contract, taker_amount)
 
-        # OK!
+        # --- OK from here
+
+        # Fill the order
         taker.fill(taker_address)
+
+        # Trigger events
         self.OrderFilledEvent(taker_id)
 
         # Both orders are filled : do the swap
@@ -130,7 +136,7 @@ class ICONSwap(IconScoreBase):
 
     def _do_swap(self, swap_id: int) -> None:
         # Check if swap exists
-        AllSwapComposite(self.db).check_exists(swap_id)
+        SystemSwapDB(self.db).check_exists(swap_id)
         swap = Swap(self.db, swap_id)
 
         # Check if the swap is pending
@@ -143,7 +149,9 @@ class ICONSwap(IconScoreBase):
         maker.check_status(OrderStatus.FILLED)
         taker.check_status(OrderStatus.FILLED)
 
-        # OK: trade the tokens
+        # --- OK from here
+
+        # Trade the tokens
         self._transfer_order(maker, taker.provider())
         self._transfer_order(taker, maker.provider())
         self.OrderTransferedEvent(maker_id, maker.contract(), maker.amount(), taker.provider())
@@ -153,13 +161,21 @@ class ICONSwap(IconScoreBase):
         swap.set_status(SwapStatus.SUCCESS)
         swap.set_transaction(self.tx.hash.hex())
         swap.set_timestamp_swap(self.now())
-        # Remove the swap from the pending list to the filled list
-        PendingSwapAccountComposite(self.db, maker.provider()).remove(swap_id)
-        FilledSwapAccountComposite(self.db, maker.provider()).add(swap_id)
-        FilledSwapAccountComposite(self.db, taker.provider()).add(swap_id)
+
+        # Remove the swap from the pending lists
+        AccountPendingSwapDB(self.db, maker.provider()).remove(swap_id)
+        PendingSwapMarketDB(self.db, (maker.contract(), taker.contract())).remove(swap_id)
+
+        # Add the swap to filled lists
+        AccountFilledSwapDB(self.db, maker.provider()).add(swap_id)
+        AccountFilledSwapDB(self.db, taker.provider()).add(swap_id)
+        FilledSwapMarketDB(self.db, (maker.contract(), taker.contract())).add(swap_id)
+
         # Set the orders as successful
         maker.set_status(OrderStatus.SUCCESS)
         taker.set_status(OrderStatus.SUCCESS)
+
+        # Trigger events
         self.SwapSuccessEvent(swap_id)
 
     def _create_swap(self,
@@ -168,21 +184,42 @@ class ICONSwap(IconScoreBase):
                      taker_contract: Address,
                      taker_amount: int,
                      maker_address: Address) -> None:
+        # Input checks
         self._check_contract(maker_contract)
         self._check_contract(taker_contract)
         self._check_different_contract(maker_contract, taker_contract)
         self._check_amount(maker_amount)
         self._check_amount(taker_amount)
 
-        # Create orders
-        maker_id = OrderFactory.create(self.db, maker_contract, maker_amount)
-        taker_id = OrderFactory.create(self.db, taker_contract, taker_amount)
-        swap_id = SwapFactory.create(self.db, maker_id, taker_id, self.now(), maker_address)
-        self.SwapCreatedEvent(swap_id, maker_id, taker_id)
+        # --- OK from here
+        pair = (maker_contract, taker_contract)
 
-        # Funds has been sent for maker
+        # Create orders and swap
+        order_factory = OrderFactory(self.db)
+        maker_id = order_factory.create(maker_contract, maker_amount)
+        taker_id = order_factory.create(taker_contract, taker_amount)
+        swap_id = SwapFactory(self.db).create(maker_id, taker_id, self.now(), maker_address)
+
+        # Add to DB
+        system_order_db = SystemOrderDB(self.db)
+        system_order_db.add(maker_id)
+        system_order_db.add(taker_id)
+
+        PendingSwapMarketDB(self.db, pair).add(swap_id)
+        SystemSwapDB(self.db).add(swap_id)
+        AccountPendingSwapDB(self.db, maker_address).add(swap_id)
+
+        # Create the market pair if it didn't exist yet
+        market_pairs_db = MarketPairsDB(self.db)
+        if not pair in market_pairs_db:
+            market_pairs_db.add(pair)
+
+        # Funds have been sent for maker
         maker = Order(self.db, maker_id)
         maker.fill(maker_address)
+
+        # Trigger events
+        self.SwapCreatedEvent(swap_id, maker_id, taker_id)
         self.OrderFilledEvent(maker_id)
 
     # ================================================
@@ -270,7 +307,7 @@ class ICONSwap(IconScoreBase):
     @external
     def cancel_swap(self, swap_id: int) -> None:
         # Check if swap exists
-        AllSwapComposite(self.db).check_exists(swap_id)
+        SystemSwapDB(self.db).check_exists(swap_id)
         swap = Swap(self.db, swap_id)
 
         # Only the maker can cancel the swap
@@ -296,7 +333,10 @@ class ICONSwap(IconScoreBase):
         # Set the swap status as unavailable
         swap.set_status(SwapStatus.CANCELLED)
         swap.set_transaction(self.tx.hash.hex())
-        PendingSwapAccountComposite(self.db, swap.maker_address()).remove(swap_id)
+
+        # Remove swap from lists
+        AccountPendingSwapDB(self.db, swap.maker_address()).remove(swap_id)
+        PendingSwapMarketDB(self.db, (maker.contract(), taker.contract())).remove(swap_id)
 
         # Set the orders as unavailable
         maker.set_status(OrderStatus.CANCELLED)
@@ -314,29 +354,52 @@ class ICONSwap(IconScoreBase):
     @catch_error
     @external(readonly=True)
     def get_swap(self, swap_id: int) -> dict:
-        AllSwapComposite(self.db).check_exists(swap_id)
+        SystemSwapDB(self.db).check_exists(swap_id)
         return Swap(self.db, swap_id).serialize()
 
     @catch_error
     @external(readonly=True)
+    def get_market_info(self) -> dict:
+        info = {
+            "pairs": []
+        }
+
+        # The max iteration count here is combination(whitelist_count, 2) (nCr, r=2)
+        # It should be fine as long as the number of tokens is < 50 (1225 iterations)
+        for pair in MarketPairsDB(self.db).keys():
+            info['pairs'].append(pair)
+
+        return info
+
+    @catch_error
+    @external(readonly=True)
+    def get_pending_swaps_by_address(self, address: Address, offset: int) -> dict:
+        pending_swaps = AccountPendingSwapDB(self.db, address).select(offset)
+        return {
+            swap_id: Swap(self.db, swap_id).serialize()
+            for swap_id in pending_swaps
+        }
+
+    @catch_error
+    @external(readonly=True)
+    def get_filled_swaps_by_address(self, address: Address, offset: int) -> dict:
+        filled_swaps = AccountFilledSwapDB(self.db, address).select(offset)
+        return {
+            swap_id: Swap(self.db, swap_id).serialize()
+            for swap_id in filled_swaps
+        }
+
+    @catch_error
+    @external(readonly=True)
     def get_order(self, order_id: int) -> dict:
-        OrderComposite(self.db).check_exists(order_id)
+        SystemOrderDB(self.db).check_exists(order_id)
         return Order(self.db, order_id).serialize()
 
     @catch_error
     @external(readonly=True)
-    def get_pending_orders_by_address(self, address: Address, offset: int) -> dict:
-        return PendingSwapAccountComposite(self.db, address).serialize(self.db, offset, Swap)
-
-    @catch_error
-    @external(readonly=True)
-    def get_filled_orders_by_address(self, address: Address, offset: int) -> dict:
-        return FilledSwapAccountComposite(self.db, address).serialize(self.db, offset, Swap)
-
-    @catch_error
-    @external(readonly=True)
-    def get_whitelist(self) -> list:
-        return Whitelist(self.db).serialize()
+    def get_whitelist(self, offset: int) -> list:
+        whitelist = Whitelist(self.db).select(offset)
+        return [contract for contract in whitelist]
 
     # ================================================
     #  Operator methods

@@ -15,10 +15,9 @@
 # limitations under the License.
 
 from iconservice import *
-from .utils import *
 from .consts import *
-from .composite import *
-from .factory import *
+from ..scorelib.id_factory import *
+from ..scorelib.utils import *
 
 # ================================================
 #  Exception
@@ -45,29 +44,25 @@ class InvalidOrderContract(Exception):
     pass
 
 
-class OrderFactory(Factory):
+class OrderFactory(IdFactory):
+
     _NAME = 'ORDER_FACTORY'
 
-    @staticmethod
-    def create(db: IconScoreDatabase,
-               contract: Address,
+    def __init__(self, db: IconScoreDatabase):
+        name = OrderFactory._NAME
+        super().__init__(name, db)
+        self._name = name
+        self._db = db
+
+    def create(self, contract: Address,
                amount: int) -> int:
 
-        uid = Factory.get_uid(db, OrderFactory._NAME)
-        item = Order(db, uid)
-        item._contract.set(contract)
-        item._amount.set(amount)
-        item._status.set(OrderStatus.EMPTY)
-        OrderComposite(db).add(uid)
-
-        return uid
-
-
-class OrderComposite(Composite):
-    _NAME = 'ORDER_COMPOSITE'
-
-    def __init__(self, db: IconScoreDatabase):
-        super().__init__(db, OrderComposite._NAME, int)
+        order_id = self.get_uid()
+        order = Order(self._db, order_id)
+        order._contract.set(contract)
+        order._amount.set(amount)
+        order._status.set(OrderStatus.EMPTY)
+        return order_id
 
 
 class OrderStatus:
@@ -78,26 +73,19 @@ class OrderStatus:
 
 
 class Order(object):
-    # ================================================
-    #  DB Variables
-    # ================================================
-    _CONTRACT = 'ORDER_CONTRACT'
-    _AMOUNT = 'ORDER_AMOUNT'
-    _PROVIDER = 'ORDER_PROVIDER'
-    _STATUS = 'ORDER_STATUS'
+
+    _NAME = 'ORDER'
 
     # ================================================
     #  Initialization
     # ================================================
     def __init__(self, db: IconScoreDatabase, uid: int) -> None:
-        self._contract = VarDB(f'{Order._CONTRACT}_{uid}', db, value_type=Address)
-        self._amount = VarDB(f'{Order._AMOUNT}_{uid}', db, value_type=int)
-        self._provider = VarDB(f'{Order._PROVIDER}_{uid}', db, value_type=Address)
-        self._status = VarDB(f'{Order._STATUS}_{uid}', db, value_type=int)
-
-    # ================================================
-    #  Private Methods
-    # ================================================
+        self._name = Order._NAME
+        self._contract = VarDB(f'{self._name}_CONTRACT_{uid}', db, value_type=Address)
+        self._amount = VarDB(f'{self._name}_AMOUNT_{uid}', db, value_type=int)
+        self._provider = VarDB(f'{self._name}_PROVIDER_{uid}', db, value_type=Address)
+        self._status = VarDB(f'{self._name}_STATUS_{uid}', db, value_type=int)
+        self._db = db
 
     # ================================================
     #  Checks

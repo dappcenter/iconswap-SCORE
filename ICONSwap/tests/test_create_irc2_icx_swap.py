@@ -30,6 +30,7 @@ from ICONSwap.tests.utils import *
 DIR_PATH = os.path.abspath(os.path.dirname(__file__))
 ICX_CONTRACT = 'cx0000000000000000000000000000000000000000'
 
+
 class TestICONSwap(IconIntegrateTestBase):
     TEST_HTTP_ENDPOINT_URI_V3 = "http://127.0.0.1:9000/api/v3"
     SCORE_PROJECT = os.path.abspath(os.path.join(DIR_PATH, '..'))
@@ -129,7 +130,6 @@ class TestICONSwap(IconIntegrateTestBase):
             icon_service=self.icon_service
         )
 
-
     def _fill_irc2_order(self, call, _from, to_, swap_id, amount):
         return call(
             super(),
@@ -137,8 +137,8 @@ class TestICONSwap(IconIntegrateTestBase):
             to_=to_,
             method="transfer",
             params={
-                '_to': self._score_address, 
-                '_value': amount, 
+                '_to': self._score_address,
+                '_value': amount,
                 '_data': json.dumps({
                     "action": "fill_irc2_order",
                     "swap_id": hex(swap_id)
@@ -164,7 +164,7 @@ class TestICONSwap(IconIntegrateTestBase):
             to_=self._irc2_address,
             method="transfer",
             params={
-                '_to': self._score_address, 
+                '_to': self._score_address,
                 '_value': 100,
                 '_data': json.dumps({
                     "action": "create_irc2_swap",
@@ -184,14 +184,14 @@ class TestICONSwap(IconIntegrateTestBase):
     def test_create_irc2_icx_swap_not_whitelisted(self):
         self._add_whitelist(ICX_CONTRACT)
         # self._irc2_address is not whitelisted
-        
+
         result = transaction_call_error(
             super(),
             from_=self._operator,
             to_=self._irc2_address,
             method="transfer",
             params={
-                '_to': self._score_address, 
+                '_to': self._score_address,
                 '_value': 100,
                 '_data': json.dumps({
                     "action": "create_irc2_swap",
@@ -200,20 +200,19 @@ class TestICONSwap(IconIntegrateTestBase):
                 }).encode('utf-8')},
             icon_service=self.icon_service
         )
-        self.assertEqual(result['failure']['message'], f"ItemDoesntExist('WHITELIST_COMPOSITE', '{self._irc2_address}')")
-
+        self.assertEqual(result['failure']['message'], f"ItemNotFound('WHITELIST_SETDB', '{self._irc2_address}')")
 
     def test_create_irc2_icx_swap_not_whitelisted(self):
         self._add_whitelist(self._irc2_address)
         # ICX_CONTRACT is not whitelisted
-        
+
         result = transaction_call_error(
             super(),
             from_=self._operator,
             to_=self._irc2_address,
             method="transfer",
             params={
-                '_to': self._score_address, 
+                '_to': self._score_address,
                 '_value': 100,
                 '_data': json.dumps({
                     "action": "create_irc2_swap",
@@ -222,8 +221,7 @@ class TestICONSwap(IconIntegrateTestBase):
                 }).encode('utf-8')},
             icon_service=self.icon_service
         )
-        self.assertEqual(result['failure']['message'], f"ItemDoesntExist('WHITELIST_COMPOSITE', '{ICX_CONTRACT}')")
-
+        self.assertEqual(result['failure']['message'], f"ItemNotFound('WHITELIST_SETDB', '{ICX_CONTRACT}')")
 
     def test_create_irc2_icx_swap_zero_amount(self):
         self._add_whitelist(self._irc2_address)
@@ -236,7 +234,7 @@ class TestICONSwap(IconIntegrateTestBase):
             to_=self._irc2_address,
             method="transfer",
             params={
-                '_to': self._score_address, 
+                '_to': self._score_address,
                 '_value': 0,
                 '_data': json.dumps({
                     "action": "create_irc2_swap",
@@ -258,7 +256,7 @@ class TestICONSwap(IconIntegrateTestBase):
             to_=self._irc2_address,
             method="transfer",
             params={
-                '_to': self._score_address, 
+                '_to': self._score_address,
                 '_value': 100,
                 '_data': json.dumps({
                     "action": "create_irc2_swap",
@@ -280,7 +278,7 @@ class TestICONSwap(IconIntegrateTestBase):
             to_=self._irc2_address,
             method="transfer",
             params={
-                '_to': self._score_address, 
+                '_to': self._score_address,
                 '_value': 100,
                 '_data': json.dumps({
                     "action": "create_irc2_swap",
@@ -302,7 +300,7 @@ class TestICONSwap(IconIntegrateTestBase):
             to_=self._irc2_address,
             method="transfer",
             params={
-                '_to': self._score_address, 
+                '_to': self._score_address,
                 '_value': 100,
                 '_data': json.dumps({
                     "action": "create_irc2_swap",

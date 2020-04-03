@@ -15,11 +15,21 @@
 # limitations under the License.
 
 from iconservice import *
+from ..scorelib.set import *
 
 
-# ================================================
-#  Consts
-# ================================================
-TAG = 'ICONSwap'
-VERSION = '0.2.0'
-ZERO_SCORE_ADDRESS = Address.from_string('cx0000000000000000000000000000000000000000')
+class InvalidWhitelistContract(Exception):
+    pass
+
+
+class Whitelist(SetDB):
+
+    _NAME = 'WHITELIST'
+
+    def __init__(self, db: IconScoreDatabase):
+        super().__init__(Whitelist._NAME, db, Address)
+
+    def add(self, token: Address) -> None:
+        if not token.is_contract:
+            raise InvalidWhitelistContract
+        super().add(token)

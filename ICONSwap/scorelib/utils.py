@@ -15,11 +15,10 @@
 # limitations under the License.
 
 from iconservice import *
+from .consts import *
 
+class Utils():
 
-# ================================================
-#  Consts
-# ================================================
-TAG = 'ICONSwap'
-VERSION = '0.2.0'
-ZERO_SCORE_ADDRESS = Address.from_string('cx0000000000000000000000000000000000000000')
+    @staticmethod
+    def enum_names(cls):
+        return [i for i in cls.__dict__.keys() if i[:1] != '_']

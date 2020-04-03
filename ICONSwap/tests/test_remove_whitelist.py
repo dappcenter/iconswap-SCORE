@@ -148,6 +148,7 @@ class TestICONSwap(IconIntegrateTestBase):
             from_=self._operator.get_address(),
             to_=self._score_address,
             method="get_whitelist",
+            params={"offset": 0},
             icon_service=self.icon_service
         )
 
@@ -163,4 +164,4 @@ class TestICONSwap(IconIntegrateTestBase):
             params={'contract': ICX_CONTRACT},
             icon_service=self.icon_service
         )
-        self.assertEqual(result['failure']['message'], f"ItemDoesntExist('WHITELIST_COMPOSITE', '{ICX_CONTRACT}')")
+        self.assertEqual(result['failure']['message'], f"ItemNotFound('WHITELIST_SETDB', '{ICX_CONTRACT}')")
