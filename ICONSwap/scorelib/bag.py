@@ -19,6 +19,7 @@ from .consts import *
 
 
 class ItemNotFound(Exception):
+    """ Cannot find an entry in the collection """
     pass
 
 
@@ -32,7 +33,7 @@ class BagDB(object):
 
     def __init__(self, var_key: str, db: IconScoreDatabase, value_type: type, order=False):
         self._name = var_key + BagDB._NAME
-        self._items = ArrayDB(self._name + '_items', db, value_type=value_type)
+        self._items = ArrayDB(f'{self._name}_items', db, value_type=value_type)
         self._order = order
         self._db = db
 
@@ -111,7 +112,7 @@ class BagDB(object):
                 next(items)
         except StopIteration:
             # Offset is bigger than the size of the bag
-            return []
+            raise StopIteration(self._name)
 
         # Do a maximum iteration count of MAX_ITERATION_LOOP
         for _ in range(MAX_ITERATION_LOOP):

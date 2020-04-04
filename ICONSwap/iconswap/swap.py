@@ -16,6 +16,7 @@
 
 from iconservice import *
 from .consts import *
+from .order import *
 from ..scorelib.id_factory import *
 from ..scorelib.utils import *
 
@@ -56,14 +57,12 @@ class SwapFactory(IdFactory):
                maker_address: Address) -> int:
 
         swap_id = self.get_uid()
-        swap = Swap(self._db, swap_id)
+        swap = Swap(swap_id, self._db)
         swap._maker_order_id.set(maker_order_id)
         swap._taker_order_id.set(taker_order_id)
         swap._timestamp_create.set(timestamp)
         swap._timestamp_swap.set(0)
-        swap._maker_address.set(maker_address)
         swap._status.set(SwapStatus.PENDING)
-        # swap._transaction.set('')
 
         return swap_id
 
@@ -81,15 +80,15 @@ class Swap(object):
     # ================================================
     #  Initialization
     # ================================================
-    def __init__(self, db: IconScoreDatabase, uid: int) -> None:
+    def __init__(self, uid: int, db: IconScoreDatabase):
         self._name = Swap._NAME
         self._maker_order_id = VarDB(f'{self._name}_MAKER_ORDER_ID_{uid}', db, value_type=int)
         self._taker_order_id = VarDB(f'{self._name}_TAKER_ORDER_ID_{uid}', db, value_type=int)
-        self._maker_address = VarDB(f'{self._name}_MAKER_ADDRESS_{uid}', db, value_type=Address)
         self._status = VarDB(f'{self._name}_STATUS_{uid}', db, value_type=int)
         self._timestamp_create = VarDB(f'{self._name}_TIMESTAMP_CREATE_{uid}', db, value_type=int)
         self._timestamp_swap = VarDB(f'{self._name}_TIMESTAMP_SWAP_{uid}', db, value_type=int)
         self._transaction = VarDB(f'{self._name}_TRANSACTION_{uid}', db, value_type=str)
+        self._uid = uid
         self._db = db
 
     # ================================================
@@ -100,7 +99,7 @@ class Swap(object):
             raise InvalidSwapStatus
 
     def check_maker_address(self, maker_address: Address) -> None:
-        if self._maker_address.get() != maker_address:
+        if Order(self._maker_order_id.get(), self._db).provider() != maker_address:
             raise InvalidMakerAddress
 
     # ================================================
@@ -116,19 +115,23 @@ class Swap(object):
         self._timestamp_swap.set(time)
 
     def get_orders(self) -> tuple:
-        return (self._maker_order_id.get(), self._taker_order_id.get())
+        maker = Order(self._maker_order_id.get(), self._db)
+        taker = Order(self._taker_order_id.get(), self._db)
+        return (maker, taker)
 
-    def maker_address(self) -> Address:
-        return self._maker_address.get()
+    def get_price(self) -> float:
+        maker, taker = self.get_orders()
+        return maker.amount() / taker.amount()
 
     def serialize(self) -> dict:
+        maker, taker = self.get_orders()
         return {
-            'maker_order_id': self._maker_order_id.get(),
-            'taker_order_id': self._taker_order_id.get(),
+            'id': self._uid,
+            'maker': maker.serialize(),
+            'taker': taker.serialize(),
             'status': Utils.enum_names(SwapStatus)[self._status.get()],
             'timestamp_create': self._timestamp_create.get(),
             'timestamp_swap': self._timestamp_swap.get(),
-            'maker_address': self._maker_address.get(),
             'transaction': self._transaction.get()
         }
 
@@ -138,5 +141,4 @@ class Swap(object):
         self._status.remove()
         self._timestamp_create.remove()
         self._timestamp_swap.remove()
-        self._maker_address.remove()
         self._transaction.remove()

@@ -23,14 +23,16 @@ from ..scorelib.set import *
 class AccountPendingSwapDB(SetDB):
     _NAME = 'ACCOUNT_PENDING_SWAP_DB'
 
-    def __init__(self, db: IconScoreDatabase, address: Address):
+    def __init__(self, address: Address, db: IconScoreDatabase):
         name = str(address) + '_' + AccountPendingSwapDB._NAME
         super().__init__(name, db, int)
+        self._name = name
 
 
 class AccountFilledSwapDB(SetDB):
     _NAME = 'ACCOUNT_FILLED_SWAP_DB'
 
-    def __init__(self, db: IconScoreDatabase, address: Address):
+    def __init__(self, address: Address, db: IconScoreDatabase):
         name = str(address) + '_' + AccountFilledSwapDB._NAME
         super().__init__(name, db, int)
+        self._name = name

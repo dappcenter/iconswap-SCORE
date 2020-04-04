@@ -18,11 +18,6 @@ from iconservice import *
 from .bag import *
 
 
-class ItemNotFound(Exception):
-    """ Invalid entry in the SetDB """
-    pass
-
-
 class SetDB(BagDB):
     """
     SetDB is an iterable collection of *unique* items.

@@ -58,7 +58,7 @@ class OrderFactory(IdFactory):
                amount: int) -> int:
 
         order_id = self.get_uid()
-        order = Order(self._db, order_id)
+        order = Order(order_id, self._db)
         order._contract.set(contract)
         order._amount.set(amount)
         order._status.set(OrderStatus.EMPTY)
@@ -79,12 +79,13 @@ class Order(object):
     # ================================================
     #  Initialization
     # ================================================
-    def __init__(self, db: IconScoreDatabase, uid: int) -> None:
+    def __init__(self, uid: int, db: IconScoreDatabase):
         self._name = Order._NAME
         self._contract = VarDB(f'{self._name}_CONTRACT_{uid}', db, value_type=Address)
         self._amount = VarDB(f'{self._name}_AMOUNT_{uid}', db, value_type=int)
         self._provider = VarDB(f'{self._name}_PROVIDER_{uid}', db, value_type=Address)
         self._status = VarDB(f'{self._name}_STATUS_{uid}', db, value_type=int)
+        self._uid = uid
         self._db = db
 
     # ================================================
@@ -117,6 +118,9 @@ class Order(object):
     def amount(self) -> int:
         return self._amount.get()
 
+    def id(self) -> int:
+        return self._uid
+
     def status(self) -> int:
         return self._status.get()
 
@@ -130,10 +134,11 @@ class Order(object):
 
     def serialize(self) -> dict:
         return {
-            'contract': self._contract.get(),
+            'id': self._uid,
+            'contract': str(self._contract.get()),
             'amount': self._amount.get(),
             'status': Utils.enum_names(OrderStatus)[self._status.get()],
-            'provider': self._provider.get()
+            'provider': str(self._provider.get())
         }
 
     def delete(self) -> None:
