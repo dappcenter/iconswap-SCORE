@@ -230,29 +230,29 @@ class TestICONSwap(IconIntegrateTestBase):
             from_=self._operator.get_address(),
             to_=self._score_address,
             method="get_market_sellers_pending_swaps",
-            params={"pair": market_info['pairs'][0], "offset": 0},
+            params={"pair": market_info['pairs'][0]['name'], "offset": 0},
             icon_service=self.icon_service
         )
 
-        print("SELLERS (du plus petit): =======================")
+        print("SELLERS =======================")
         print(json.dumps(market_sellers, indent=4))
-        self.assertEqual(market_sellers[0]['maker']['amount'], 10)
-        self.assertEqual(market_sellers[0]['taker']['amount'], 20)
+        self.assertEqual(market_sellers[0]['maker']['amount'], 200)
+        self.assertEqual(market_sellers[0]['taker']['amount'], 300)
         self.assertEqual(market_sellers[1]['maker']['amount'], 100)
         self.assertEqual(market_sellers[1]['taker']['amount'], 200)
-        self.assertEqual(market_sellers[2]['maker']['amount'], 200)
-        self.assertEqual(market_sellers[2]['taker']['amount'], 300)
+        self.assertEqual(market_sellers[2]['maker']['amount'], 10)
+        self.assertEqual(market_sellers[2]['taker']['amount'], 20)
 
         market_buyers = icx_call(
             super(),
             from_=self._operator.get_address(),
             to_=self._score_address,
             method="get_market_buyers_pending_swaps",
-            params={"pair": market_info['pairs'][0], "offset": 0},
+            params={"pair": market_info['pairs'][0]['name'], "offset": 0},
             icon_service=self.icon_service
         )
 
-        print("BUYERS (du plus grand): =======================")
+        print("BUYERS =======================")
         print(json.dumps(market_buyers, indent=4))
         self.assertEqual(market_buyers[0]['maker']['amount'], 10)
         self.assertEqual(market_buyers[0]['taker']['amount'], 20)
@@ -267,7 +267,7 @@ class TestICONSwap(IconIntegrateTestBase):
             from_=self._operator.get_address(),
             to_=self._score_address,
             method="get_market_filled_swaps",
-            params={"pair": market_info['pairs'][0], "offset": 0},
+            params={"pair": market_info['pairs'][0]['name'], "offset": 0},
             icon_service=self.icon_service
         )
 

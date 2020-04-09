@@ -16,6 +16,7 @@
 
 from iconservice import *
 from .swap import *
+from ..interfaces.irc2 import *
 from ..scorelib.linked_list import *
 from ..scorelib.set import *
 
@@ -32,50 +33,68 @@ class _MarketSidePendingSwapDB(LinkedListDB):
         self._name = name
         self._db = db
 
-    def add(self, new_swap_id: int) -> None:
+    def add(self, new_swap_id: int, compare) -> None:
         """ Iterate through swap list and insert it according to the price """
-        new_swap_price = Swap(new_swap_id, self._db).get_price()
-
         # Find positionning in the list for the current item
         for swap_node_id, cur_swap_id in self:
-            cur_swap_price = Swap(cur_swap_id, self._db).get_price()
-            if new_swap_price < cur_swap_price:
-                self.prepend_before(new_swap_id, swap_node_id)
+            if compare(new_swap_id, cur_swap_id):
+                self.prepend_before(new_swap_id, swap_node_id, new_swap_id)
                 break
         else:
-            self.append(new_swap_id)
+            self.append(new_swap_id, new_swap_id)
 
 
 class _MarketBuyersPendingSwapDB(_MarketSidePendingSwapDB):
-    _NAME = 'BUYERS'
+    _NAME = '_BUYERS'
 
     def __init__(self, var_key: str, db: IconScoreDatabase):
         name = var_key + _MarketBuyersPendingSwapDB._NAME
         super().__init__(name, db)
         self._name = name
+        self._db = db
+
+    def compare(self, new_swap_id: int, cur_swap_id: int) -> bool:
+        new_swap_price = Swap(new_swap_id, self._db).get_price()
+        cur_swap_price = Swap(cur_swap_id, self._db).get_price()
+        return new_swap_price > cur_swap_price
+
+    def add(self, new_swap_id: int) -> None:
+        super().add(new_swap_id, self.compare)
 
 
 class _MarketSellersPendingSwapDB(_MarketSidePendingSwapDB):
-    _NAME = 'SELLERS'
+    _NAME = '_SELLERS'
 
     def __init__(self, var_key: str, db: IconScoreDatabase):
         name = var_key + _MarketSellersPendingSwapDB._NAME
         super().__init__(name, db)
         self._name = name
 
+    def compare(self, new_swap_id: int, cur_swap_id: int) -> bool:
+        new_swap_price = Swap(new_swap_id, self._db).get_inverted_price()
+        cur_swap_price = Swap(cur_swap_id, self._db).get_inverted_price()
+        Logger.warning("seller: n, c = %.2f, %.2f" % (new_swap_price, cur_swap_price))
+        return new_swap_price > cur_swap_price
+
+    def add(self, new_swap_id: int) -> None:
+        super().add(new_swap_id, self.compare)
+
 
 class MarketPendingSwapDB:
     """ MarketPendingSwapDB is two linked lists of swaps (buyers and sellers)
         sorted by their price
      """
-    _NAME = 'MARKET_PENDING_SWAP_DB'
+    _NAME = '_MARKET_PENDING_SWAP_DB'
 
     def __init__(self, pair: tuple, db: IconScoreDatabase):
-        self._name = MarketPairsDB.get_pair_name(pair) + '_' + MarketPendingSwapDB._NAME
+        self._name = MarketPairsDB.get_pair_name(pair) + MarketPendingSwapDB._NAME
         self._buyers = _MarketBuyersPendingSwapDB(self._name, db)
         self._sellers = _MarketSellersPendingSwapDB(self._name, db)
         self._pair = pair
         self._db = db
+
+    def __len__(self) -> int:
+        return len(self._buyers) + len(self._sellers)
 
     def buyers(self) -> _MarketBuyersPendingSwapDB:
         return self._buyers

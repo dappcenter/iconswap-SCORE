@@ -1,0 +1,24 @@
+{
+    "jsonrpc": "2.0",
+    "method": "icx_sendTransaction",
+    "params": {
+        "version": "0x3",
+        "stepLimit": "0x1000000",
+        "nonce": "0x0",
+        "to": "xxx",
+        "dataType": "call",
+        "data": {
+            "method": "transfer",
+            "params": {
+                "_to": "",
+                "_value": "",
+                "_data": {
+                    "action": "create_irc2_swap",
+                    "taker_contract": "cx0000000000000000000000000000000000000000",
+                    "taker_amount": ""
+                }
+            }
+        }
+    },
+    "id": 1
+}

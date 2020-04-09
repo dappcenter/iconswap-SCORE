@@ -18,6 +18,7 @@ from iconservice import *
 from .checks import *
 from .version import *
 from .consts import *
+from .maintenance import *
 from .iconswap.system import *
 from .iconswap.market import *
 from .iconswap.account import *
@@ -33,6 +34,8 @@ class InvalidTokenFallbackParams(Exception):
 
 class ICONSwap(IconScoreBase):
     """ ICONSwap SCORE Base implementation """
+
+    _NAME = 'ICONSwap'
 
     # ================================================
     #  Event Logs
@@ -69,6 +72,7 @@ class ICONSwap(IconScoreBase):
 
     def on_install(self) -> None:
         super().on_install()
+        SCOREMaintenance(self.db).disable()
         Version.set(self.db, VERSION)
 
     def on_update(self) -> None:
@@ -84,6 +88,11 @@ class ICONSwap(IconScoreBase):
         else:
             irc2 = self.create_interface_score(order.contract(), IRC2Interface)
             irc2.transfer(dest, order.amount())
+
+    def _get_market_last_filled_swap(self, pair: str) -> Swap:
+        filled_swaps = MarketFilledSwapDB(tuple(pair.split('/')), self.db).select(0)
+        if filled_swaps:
+            return Swap(filled_swaps[0][1], self.db)
 
     def _refund_order(self, order: Order) -> None:
         self._transfer_order(order, order.provider())
@@ -245,12 +254,13 @@ class ICONSwap(IconScoreBase):
         revert("ICONSwap contract doesn't accept direct ICX transfers")
 
     @catch_error
+    @check_maintenance
     @external
     def tokenFallback(self, _from: Address, _value: int, _data: bytes) -> None:
         """
             Create or fill a swap based on a IRC2 token
 
-            :param Address _from: 
+            :param Address _from:
                 When creating a swap, the maker address;
                 When filling a swap, the taker address
             :param int _value:
@@ -260,7 +270,7 @@ class ICONSwap(IconScoreBase):
 
                Create IRC2 Swap:
                 {
-                    "action": "create_irc2_swap", 
+                    "action": "create_irc2_swap",
                     "taker_contract": The taker token contract address being traded with the current token
                     "taker_amount": The amount of taker token required (hex encoded)
                 }
@@ -295,6 +305,7 @@ class ICONSwap(IconScoreBase):
             raise InvalidTokenFallbackParams
 
     @catch_error
+    @check_maintenance
     @external
     @payable
     def create_icx_swap(self, taker_contract: Address, taker_amount: int) -> None:
@@ -302,16 +313,7 @@ class ICONSwap(IconScoreBase):
         maker_amount = self.msg.value
         self._create_swap(ZERO_SCORE_ADDRESS, maker_amount, taker_contract, taker_amount, maker_address)
 
-    @catch_error
-    @external
-    def cancel_swap(self, swap_id: int) -> None:
-        # Check if swap exists
-        SystemSwapDB(self.db).check_exists(swap_id)
-        swap = Swap(swap_id, self.db)
-
-        # Only the maker can cancel the swap
-        swap.check_maker_address(self.msg.sender)
-
+    def _cancel_swap(self, swap: Swap) -> None:
         # Swap must be pending
         swap.check_status(SwapStatus.PENDING)
 
@@ -319,6 +321,7 @@ class ICONSwap(IconScoreBase):
         # Get the orders associated with the swap
         maker, taker = swap.get_orders()
         pair = (maker.contract(), taker.contract())
+        maker_address = maker.provider()
 
         # Refund if filled
         if maker.status() == OrderStatus.FILLED:
@@ -334,15 +337,29 @@ class ICONSwap(IconScoreBase):
         swap.set_transaction(self.tx.hash.hex())
 
         # Remove swap from lists
-        AccountPendingSwapDB(maker.provider(), self.db).remove(swap_id)
-        MarketPendingSwapDB(pair, self.db).remove(swap_id)
+        AccountPendingSwapDB(maker_address, self.db).remove(swap.id())
+        MarketPendingSwapDB(pair, self.db).remove(swap.id())
 
         # Set the orders as unavailable
         maker.set_status(OrderStatus.CANCELLED)
         taker.set_status(OrderStatus.CANCELLED)
-        self.SwapCancelledEvent(swap_id)
+        self.SwapCancelledEvent(swap.id())
 
     @catch_error
+    @check_maintenance
+    @external
+    def cancel_swap(self, swap_id: int) -> None:
+        # Check if swap exists
+        SystemSwapDB(self.db).check_exists(swap_id)
+        swap = Swap(swap_id, self.db)
+
+        # Only the maker can cancel the swap
+        swap.check_maker_address(self.msg.sender)
+
+        self._cancel_swap(swap)
+
+    @catch_error
+    @check_maintenance
     @external
     @payable
     def fill_icx_order(self, swap_id: int) -> None:
@@ -353,8 +370,53 @@ class ICONSwap(IconScoreBase):
     @catch_error
     @external(readonly=True)
     def get_market_info(self, offset: int) -> dict:
+
+        tokens = {}
+        pairs = []
+
+        # Fill the tokens cache info
+        for pair in MarketPairsDB(self.db).select(offset):
+            pairs.append({"name": pair})
+            spots = pair.split('/')
+
+            for spot in spots:
+                if spot in tokens:
+                    # Already in the cache
+                    continue
+
+                if spot == str(ZERO_SCORE_ADDRESS):
+                    tokens[spot] = {
+                        "name": "ICX",
+                        "symbol": "ICX",
+                        "decimals": 18
+                    }
+                else:
+                    address = Address.from_string(spot)
+                    irc2 = self.create_interface_score(address, IRC2Interface)
+                    tokens[spot] = {
+                        "name": irc2.name(),
+                        "symbol": irc2.symbol(),
+                        "decimals": irc2.decimals()
+                    }
+
+        # build the pairs info
+        for pair in pairs:
+            pair_tuple = tuple(pair['name'].split('/'))
+            pair['swaps_pending_count'] = len(MarketPendingSwapDB(pair_tuple, self.db))
+            last_swap = self._get_market_last_filled_swap(pair['name'])
+            if last_swap:
+                # most recent swap
+                orders = last_swap.get_orders()
+                if MarketPairsDB.is_buyer(pair_tuple, orders[0]):
+                    pair['last_price'] = last_swap.get_inverted_price()
+                else:
+                    pair['last_price'] = last_swap.get_price()
+            else:
+                pair['last_price'] = float(0)
+
         return {
-            "pairs": MarketPairsDB(self.db).select(offset)
+            "pairs": pairs,
+            "tokens": tokens
         }
 
     @catch_error
@@ -374,6 +436,12 @@ class ICONSwap(IconScoreBase):
             Swap(swap_id, self.db).serialize()
             for _, swap_id in pending_swaps.sellers().select(offset)
         ]
+
+    @catch_error
+    @external(readonly=True)
+    def get_market_last_filled_swap(self, pair: str) -> dict:
+        last_swap = self._get_market_last_filled_swap(pair)
+        return last_swap.serialize() if last_swap else {}
 
     @catch_error
     @external(readonly=True)
@@ -434,3 +502,20 @@ class ICONSwap(IconScoreBase):
     @only_owner
     def remove_whitelist(self, contract: Address) -> None:
         Whitelist(self.db).remove(contract)
+
+    @catch_error
+    @external
+    @only_owner
+    def cancel_swap_admin(self, swap_id: int) -> None:
+        # Check if swap exists
+        SystemSwapDB(self.db).check_exists(swap_id)
+        swap = Swap(swap_id, self.db)
+        self._cancel_swap(swap)
+
+    @catch_error
+    @external
+    @only_owner
+    def set_maintenance_mode(self, mode: int) -> None:
+        if (mode == SCOREMaintenanceMode.MAINTENANCE_ENABLED
+                or mode == SCOREMaintenanceMode.MAINTENANCE_DISABLED):
+            self._maintenance_mode.set(mode)

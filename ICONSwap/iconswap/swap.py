@@ -105,6 +105,9 @@ class Swap(object):
     # ================================================
     #  Public Methods
     # ================================================
+    def id(self) -> int:
+        return self._uid
+
     def set_status(self, status: int) -> None:
         self._status.set(status)
 
@@ -122,6 +125,10 @@ class Swap(object):
     def get_price(self) -> float:
         maker, taker = self.get_orders()
         return maker.amount() / taker.amount()
+
+    def get_inverted_price(self) -> float:
+        maker, taker = self.get_orders()
+        return taker.amount() / maker.amount()
 
     def serialize(self) -> dict:
         maker, taker = self.get_orders()
