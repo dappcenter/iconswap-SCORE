@@ -23,8 +23,8 @@ class SCOREInMaintenanceException(Exception):
 
 
 class SCOREMaintenanceMode:
-    ENABLED = 0
     DISABLED = 0
+    ENABLED = 1
 
 
 class SCOREMaintenance:
@@ -42,10 +42,10 @@ class SCOREMaintenance:
         self._maintenance_mode.set(SCOREMaintenanceMode.DISABLED)
 
     def is_enabled(self) -> bool:
-        self._maintenance_mode.get() == SCOREMaintenanceMode.ENABLED
+        return self._maintenance_mode.get() == SCOREMaintenanceMode.ENABLED
 
     def is_disabled(self) -> bool:
-        self._maintenance_mode.get() == SCOREMaintenanceMode.DISABLED
+        return self._maintenance_mode.get() == SCOREMaintenanceMode.DISABLED
 
 
 def check_maintenance(func):
