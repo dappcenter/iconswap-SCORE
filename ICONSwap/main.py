@@ -488,6 +488,11 @@ class ICONSwap(IconScoreBase):
         whitelist = Whitelist(self.db).select(offset)
         return [contract for contract in whitelist]
 
+    @catch_error
+    @external(readonly=True)
+    def maintenance_enabled(self) -> bool:
+        return SCOREMaintenance(self.db).is_enabled()
+
     # ================================================
     #  Operator methods
     # ================================================
@@ -516,6 +521,7 @@ class ICONSwap(IconScoreBase):
     @external
     @only_owner
     def set_maintenance_mode(self, mode: int) -> None:
-        if (mode == SCOREMaintenanceMode.MAINTENANCE_ENABLED
-                or mode == SCOREMaintenanceMode.MAINTENANCE_DISABLED):
-            self._maintenance_mode.set(mode)
+        if mode == SCOREMaintenanceMode.ENABLED:
+            SCOREMaintenance(self.db).enable()
+        elif mode == SCOREMaintenanceMode.DISABLED:
+            SCOREMaintenance(self.db).disable()
