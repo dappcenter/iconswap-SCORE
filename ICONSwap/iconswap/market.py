@@ -23,7 +23,7 @@ from ..scorelib.set import *
 
 class _MarketSidePendingSwapDB(LinkedListDB):
     """ _MarketSidePendingSwapDB is a linked list of swaps
-        sorted by their ascending maker/price price
+        sorted by a given "compare" function
      """
     _NAME = '_MARKET_SIDE_PENDING_SWAP_DB'
 
@@ -45,6 +45,9 @@ class _MarketSidePendingSwapDB(LinkedListDB):
 
 
 class _MarketBuyersPendingSwapDB(_MarketSidePendingSwapDB):
+    """ _MarketBuyersPendingSwapDB is a linked list of swaps
+        of buyers in a given market sorted by a descending price
+     """
     _NAME = '_BUYERS'
 
     def __init__(self, var_key: str, db: IconScoreDatabase):
@@ -63,6 +66,9 @@ class _MarketBuyersPendingSwapDB(_MarketSidePendingSwapDB):
 
 
 class _MarketSellersPendingSwapDB(_MarketSidePendingSwapDB):
+    """ _MarketSellersPendingSwapDB is a linked list of swaps
+        of sellers in a given market sorted by a descending price
+     """
     _NAME = '_SELLERS'
 
     def __init__(self, var_key: str, db: IconScoreDatabase):
