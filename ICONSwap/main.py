@@ -92,7 +92,7 @@ class ICONSwap(IconScoreBase):
     def _get_market_last_filled_swap(self, pair: str) -> Swap:
         filled_swaps = MarketFilledSwapDB(tuple(pair.split('/')), self.db).select(0)
         if filled_swaps:
-            return Swap(filled_swaps[0][1], self.db)
+            return Swap(filled_swaps[0], self.db)
 
     def _refund_order(self, order: Order) -> None:
         self._transfer_order(order, order.provider())
@@ -430,7 +430,7 @@ class ICONSwap(IconScoreBase):
         pending_swaps = MarketPendingSwapDB(tuple(pair.split('/')), self.db)
         return [
             Swap(swap_id, self.db).serialize()
-            for _, swap_id in pending_swaps.buyers().select(offset)
+            for swap_id in pending_swaps.buyers().select(offset)
         ]
 
     @catch_error
@@ -439,7 +439,7 @@ class ICONSwap(IconScoreBase):
         pending_swaps = MarketPendingSwapDB(tuple(pair.split('/')), self.db)
         return [
             Swap(swap_id, self.db).serialize()
-            for _, swap_id in pending_swaps.sellers().select(offset)
+            for swap_id in pending_swaps.sellers().select(offset)
         ]
 
     @catch_error
@@ -454,7 +454,7 @@ class ICONSwap(IconScoreBase):
         filled_swaps = MarketFilledSwapDB(tuple(pair.split('/')), self.db)
         return [
             Swap(swap_id, self.db).serialize()
-            for _, swap_id in filled_swaps.select(offset)
+            for swap_id in filled_swaps.select(offset)
         ]
 
     @catch_error
@@ -463,7 +463,7 @@ class ICONSwap(IconScoreBase):
         pending_swaps = AccountPendingSwapDB(address, self.db)
         return [
             Swap(swap_id, self.db).serialize()
-            for _, swap_id in pending_swaps.select(offset)
+            for swap_id in pending_swaps.select(offset)
         ]
 
     @catch_error
@@ -472,7 +472,7 @@ class ICONSwap(IconScoreBase):
         filled_swaps = AccountFilledSwapDB(address, self.db)
         return [
             Swap(swap_id, self.db).serialize()
-            for _, swap_id in filled_swaps.select(offset)
+            for swap_id in filled_swaps.select(offset)
         ]
 
     @catch_error
@@ -481,7 +481,7 @@ class ICONSwap(IconScoreBase):
         pending_swaps = AccountPairPendingSwapDB(address, tuple(pair.split('/')), self.db)
         return [
             Swap(swap_id, self.db).serialize()
-            for _, swap_id in pending_swaps.select(offset)
+            for swap_id in pending_swaps.select(offset)
         ]
 
     @catch_error
@@ -490,7 +490,7 @@ class ICONSwap(IconScoreBase):
         filled_swaps = AccountPairFilledSwapDB(address, tuple(pair.split('/')), self.db)
         return [
             Swap(swap_id, self.db).serialize()
-            for _, swap_id in filled_swaps.select(offset)
+            for swap_id in filled_swaps.select(offset)
         ]
 
     @catch_error
