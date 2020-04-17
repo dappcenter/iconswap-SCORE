@@ -16,22 +16,12 @@
 
 import os
 import json
-
-from iconsdk.builder.transaction_builder import DeployTransactionBuilder
-from iconsdk.builder.call_builder import CallBuilder
-from iconsdk.icon_service import IconService
-from iconsdk.libs.in_memory_zip import gen_deploy_data_content
-from iconsdk.providers.http_provider import HTTPProvider
-from iconsdk.signed_transaction import SignedTransaction
-
-from tbears.libs.icon_integrate_test import IconIntegrateTestBase, SCORE_INSTALL_ADDRESS
-from ICONSwap.tests.utils import *
+from ICONSwap.tests.iconswap_utils import *
 
 DIR_PATH = os.path.abspath(os.path.dirname(__file__))
-ICX_CONTRACT = 'cx0000000000000000000000000000000000000000'
 
 
-class TestICONSwap(IconIntegrateTestBase):
+class TestICONSwap(ICONSwapTests):
     TEST_HTTP_ENDPOINT_URI_V3 = "http://127.0.0.1:9000/api/v3"
     SCORE_PROJECT = os.path.abspath(os.path.join(DIR_PATH, '..'))
     IRC2_PROJECT = os.path.abspath(os.path.join(DIR_PATH, './irc2'))
@@ -40,8 +30,6 @@ class TestICONSwap(IconIntegrateTestBase):
         super().setUp()
 
         self.icon_service = None
-        # if you want to send request to network, uncomment next line and set self.TEST_HTTP_ENDPOINT_URI_V3
-        # self.icon_service = IconService(HTTPProvider(self.TEST_HTTP_ENDPOINT_URI_V3))
 
         # install SCORE
         self._score_address = self._deploy_score(self.SCORE_PROJECT)['scoreAddress']
@@ -63,70 +51,20 @@ class TestICONSwap(IconIntegrateTestBase):
         self._operator_irc2_balance = get_irc2_balance(super(), address=self._operator.get_address(), token=self._irc2_address, icon_service=self.icon_service)
         self._user_irc2_balance = get_irc2_balance(super(), address=self._user.get_address(), token=self._irc2_address, icon_service=self.icon_service)
 
-    def _deploy_score(self, project, to: str = SCORE_INSTALL_ADDRESS) -> dict:
-        # Generates an instance of transaction for deploying SCORE.
-        transaction = DeployTransactionBuilder() \
-            .from_(self._test1.get_address()) \
-            .to(to) \
-            .step_limit(100_000_000_000) \
-            .nid(3) \
-            .nonce(100) \
-            .content_type("application/zip") \
-            .content(gen_deploy_data_content(project)) \
-            .build()
-
-        # Returns the signed transaction object having a signature
-        signed_transaction = SignedTransaction(transaction, self._test1)
-
-        # process the transaction in local
-        result = self.process_transaction(
-            signed_transaction, self.icon_service)
-
-        self.assertTrue('status' in result)
-        self.assertEqual(1, result['status'])
-        self.assertTrue('scoreAddress' in result)
-
-        return result
-
-    def _deploy_irc2(self, project, to: str = SCORE_INSTALL_ADDRESS) -> dict:
-        # Generates an instance of transaction for deploying SCORE.
-        transaction = DeployTransactionBuilder() \
-            .params({
-                "_initialSupply": 0x100000000000,
-                "_decimals": 18,
-                "_name": 'StandardToken',
-                "_symbol": 'ST',
-            }) \
-            .from_(self._operator.get_address()) \
-            .to(to) \
-            .step_limit(100_000_000_000) \
-            .nid(3) \
-            .nonce(100) \
-            .content_type("application/zip") \
-            .content(gen_deploy_data_content(project)) \
-            .build()
-
-        # Returns the signed transaction object having a signature
-        signed_transaction = SignedTransaction(transaction, self._operator)
-
-        # process the transaction in local
-        result = self.process_transaction(
-            signed_transaction, self.icon_service)
-
-        self.assertTrue('status' in result)
-        self.assertEqual(1, result['status'])
-        self.assertTrue('scoreAddress' in result)
-
-        return result
-
-    def _add_whitelist(self, contract):
-        # OK
-        result = transaction_call_success(
+    def create_irc2_irc2_swap_error(self, a1, a2):
+        return transaction_call_error(
             super(),
             from_=self._operator,
-            to_=self._score_address,
-            method="add_whitelist",
-            params={'contract': contract},
+            to_=self._irc2_address,
+            method="transfer",
+            params={
+                '_to': self._score_address,
+                '_value': a1,
+                '_data': json.dumps({
+                    "action": "create_irc2_swap",
+                    "taker_contract": self._irc2_address_2,
+                    "taker_amount": hex(a2),
+                }).encode('utf-8')},
             icon_service=self.icon_service
         )
 
@@ -135,25 +73,7 @@ class TestICONSwap(IconIntegrateTestBase):
         self._add_whitelist(self._irc2_address)
         self._add_whitelist(self._irc2_address_2)
 
-        # OK
-        result = transaction_call_success(
-            super(),
-            from_=self._operator,
-            to_=self._irc2_address,
-            method="transfer",
-            params={
-                '_to': self._score_address,
-                '_value': 100,
-                '_data': json.dumps({
-                    "action": "create_irc2_swap",
-                    "taker_contract": self._irc2_address_2,
-                    "taker_amount": hex(200),
-                }).encode('utf-8')},
-            icon_service=self.icon_service
-        )
-
-        indexed = result['eventLogs'][0]['indexed']
-        self.assertEqual(indexed[0], 'SwapCreatedEvent(int,int,int)')
+        result = self._create_irc2_irc2_swap(100, 200)
 
         # OK
         operator_irc2_balance = get_irc2_balance(super(), address=self._operator.get_address(), token=self._irc2_address, icon_service=self.icon_service)
@@ -162,43 +82,14 @@ class TestICONSwap(IconIntegrateTestBase):
     def test_create_irc2_irc2_swap_not_whitelisted(self):
         self._add_whitelist(self._irc2_address)
         # self._irc2_address_2 is not whitelisted
-
-        result = transaction_call_error(
-            super(),
-            from_=self._operator,
-            to_=self._irc2_address,
-            method="transfer",
-            params={
-                '_to': self._score_address,
-                '_value': 100,
-                '_data': json.dumps({
-                    "action": "create_irc2_swap",
-                    "taker_contract": self._irc2_address_2,
-                    "taker_amount": hex(200),
-                }).encode('utf-8')},
-            icon_service=self.icon_service
-        )
+        result = self.create_irc2_irc2_swap_error(100, 200)
         self.assertEqual(result['failure']['message'], "ItemNotFound('WHITELIST_SETDB', '" + self._irc2_address_2 + "')")
 
     def test_create_irc2_irc2_swap_not_whitelisted_2(self):
         # self._irc2_address is not whitelisted
         self._add_whitelist(self._irc2_address_2)
 
-        result = transaction_call_error(
-            super(),
-            from_=self._operator,
-            to_=self._irc2_address,
-            method="transfer",
-            params={
-                '_to': self._score_address,
-                '_value': 100,
-                '_data': json.dumps({
-                    "action": "create_irc2_swap",
-                    "taker_contract": self._irc2_address_2,
-                    "taker_amount": hex(200),
-                }).encode('utf-8')},
-            icon_service=self.icon_service
-        )
+        result = self.create_irc2_irc2_swap_error(100, 200)
         self.assertEqual(result['failure']['message'], f"ItemNotFound('WHITELIST_SETDB', '{self._irc2_address}')")
 
     def test_create_irc2_irc2_swap_zero_amount(self):
@@ -206,21 +97,7 @@ class TestICONSwap(IconIntegrateTestBase):
         self._add_whitelist(self._irc2_address_2)
 
         # Amount cannot be zero
-        result = transaction_call_error(
-            super(),
-            from_=self._operator,
-            to_=self._irc2_address,
-            method="transfer",
-            params={
-                '_to': self._score_address,
-                '_value': 0,
-                '_data': json.dumps({
-                    "action": "create_irc2_swap",
-                    "taker_contract": self._irc2_address_2,
-                    "taker_amount": hex(200),
-                }).encode('utf-8')},
-            icon_service=self.icon_service
-        )
+        result = self.create_irc2_irc2_swap_error(0, 200)
         self.assertEqual(result['failure']['message'], 'InvalidOrderAmount()')
 
     def test_create_irc2_irc2_swap_zero_amount_2(self):
@@ -228,21 +105,7 @@ class TestICONSwap(IconIntegrateTestBase):
         self._add_whitelist(self._irc2_address_2)
 
         # Amount cannot be zero
-        result = transaction_call_error(
-            super(),
-            from_=self._operator,
-            to_=self._irc2_address,
-            method="transfer",
-            params={
-                '_to': self._score_address,
-                '_value': 100,
-                '_data': json.dumps({
-                    "action": "create_irc2_swap",
-                    "taker_contract": self._irc2_address_2,
-                    "taker_amount": hex(0),
-                }).encode('utf-8')},
-            icon_service=self.icon_service
-        )
+        result = self.create_irc2_irc2_swap_error(100, 0)
         self.assertEqual(result['failure']['message'], 'InvalidOrderAmount()')
 
     def test_create_irc2_irc2_swap_badaddr(self):

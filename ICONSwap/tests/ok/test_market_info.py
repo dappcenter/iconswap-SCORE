@@ -236,12 +236,12 @@ class TestICONSwap(IconIntegrateTestBase):
 
         print("SELLERS =======================")
         print(json.dumps(market_sellers, indent=4))
-        self.assertEqual(market_sellers[0]['maker']['amount'], 200)
-        self.assertEqual(market_sellers[0]['taker']['amount'], 300)
+        self.assertEqual(market_sellers[0]['maker']['amount'], 10)
+        self.assertEqual(market_sellers[0]['taker']['amount'], 20)
         self.assertEqual(market_sellers[1]['maker']['amount'], 100)
         self.assertEqual(market_sellers[1]['taker']['amount'], 200)
-        self.assertEqual(market_sellers[2]['maker']['amount'], 10)
-        self.assertEqual(market_sellers[2]['taker']['amount'], 20)
+        self.assertEqual(market_sellers[2]['maker']['amount'], 200)
+        self.assertEqual(market_sellers[2]['taker']['amount'], 300)
 
         market_buyers = icx_call(
             super(),
@@ -254,10 +254,10 @@ class TestICONSwap(IconIntegrateTestBase):
 
         print("BUYERS =======================")
         print(json.dumps(market_buyers, indent=4))
-        self.assertEqual(market_buyers[0]['maker']['amount'], 10)
-        self.assertEqual(market_buyers[0]['taker']['amount'], 20)
-        self.assertEqual(market_buyers[1]['maker']['amount'], 20)
-        self.assertEqual(market_buyers[1]['taker']['amount'], 30)
+        self.assertEqual(market_buyers[0]['maker']['amount'], 20)
+        self.assertEqual(market_buyers[0]['taker']['amount'], 30)
+        self.assertEqual(market_buyers[1]['maker']['amount'], 10)
+        self.assertEqual(market_buyers[1]['taker']['amount'], 20)
 
         self._fill_irc2_order_success(self._user, self._irc2_address, swap_id_10icx_20irc2, 20)
         self._fill_irc2_order_success(self._user, self._irc2_address, swap_id_100icx_200irc2, 200)
@@ -272,3 +272,7 @@ class TestICONSwap(IconIntegrateTestBase):
         )
 
         print(json.dumps(filled_swaps, indent=4))
+        self.assertEqual(filled_swaps[0]['maker']['amount'], 100)
+        self.assertEqual(filled_swaps[0]['taker']['amount'], 200)
+        self.assertEqual(filled_swaps[1]['maker']['amount'], 10)
+        self.assertEqual(filled_swaps[1]['taker']['amount'], 20)

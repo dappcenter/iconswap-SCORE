@@ -28,7 +28,7 @@ function process {
     if [[ "$txhash" != "0x" ]]; then
         debug " \`-> ${result}"
         debug " \`-> Getting result for TxHash: ${txhash} ..."
-        sleep 1
+        sleep 5
 
         # Wait for the txresult
         while true; do

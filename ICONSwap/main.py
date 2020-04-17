@@ -169,11 +169,14 @@ class ICONSwap(IconScoreBase):
 
         # Remove the swap from the pending lists
         AccountPendingSwapDB(maker.provider(), self.db).remove(swap_id)
+        AccountPairPendingSwapDB(maker.provider(), pair, self.db).remove(swap_id)
         MarketPendingSwapDB(pair, self.db).remove(swap_id)
 
         # Add the swap to filled lists
-        AccountFilledSwapDB(maker.provider(), self.db).add(swap_id)
-        AccountFilledSwapDB(taker.provider(), self.db).add(swap_id)
+        AccountFilledSwapDB(maker.provider(), self.db).prepend(swap_id)
+        AccountFilledSwapDB(taker.provider(), self.db).prepend(swap_id)
+        AccountPairFilledSwapDB(maker.provider(), pair, self.db).prepend(swap_id)
+        AccountPairFilledSwapDB(taker.provider(), pair, self.db).prepend(swap_id)
         MarketFilledSwapDB(pair, self.db).prepend(swap_id)
 
         # Set the orders as successful
@@ -213,7 +216,8 @@ class ICONSwap(IconScoreBase):
         MarketPendingSwapDB(pair, self.db).add(swap_id)
 
         SystemSwapDB(self.db).add(swap_id)
-        AccountPendingSwapDB(maker_address, self.db).add(swap_id)
+        AccountPendingSwapDB(maker_address, self.db).prepend(swap_id)
+        AccountPairPendingSwapDB(maker_address, pair, self.db).prepend(swap_id)
 
         # Create the market pair if it didn't exist yet
         market_pairs_db = MarketPairsDB(self.db)
@@ -338,6 +342,7 @@ class ICONSwap(IconScoreBase):
 
         # Remove swap from lists
         AccountPendingSwapDB(maker_address, self.db).remove(swap.id())
+        AccountPairPendingSwapDB(maker_address, pair, self.db).remove(swap.id())
         MarketPendingSwapDB(pair, self.db).remove(swap.id())
 
         # Set the orders as unavailable
@@ -458,7 +463,7 @@ class ICONSwap(IconScoreBase):
         pending_swaps = AccountPendingSwapDB(address, self.db)
         return [
             Swap(swap_id, self.db).serialize()
-            for swap_id in pending_swaps.select(offset)
+            for _, swap_id in pending_swaps.select(offset)
         ]
 
     @catch_error
@@ -467,7 +472,25 @@ class ICONSwap(IconScoreBase):
         filled_swaps = AccountFilledSwapDB(address, self.db)
         return [
             Swap(swap_id, self.db).serialize()
-            for swap_id in filled_swaps.select(offset)
+            for _, swap_id in filled_swaps.select(offset)
+        ]
+
+    @catch_error
+    @external(readonly=True)
+    def get_account_pair_pending_swaps(self, address: Address, pair: str, offset: int) -> list:
+        pending_swaps = AccountPairPendingSwapDB(address, tuple(pair.split('/')), self.db)
+        return [
+            Swap(swap_id, self.db).serialize()
+            for _, swap_id in pending_swaps.select(offset)
+        ]
+
+    @catch_error
+    @external(readonly=True)
+    def get_account_pair_filled_swaps(self, address: Address, pair: str, offset: int) -> list:
+        filled_swaps = AccountPairFilledSwapDB(address, tuple(pair.split('/')), self.db)
+        return [
+            Swap(swap_id, self.db).serialize()
+            for _, swap_id in filled_swaps.select(offset)
         ]
 
     @catch_error

@@ -79,7 +79,6 @@ class _MarketSellersPendingSwapDB(_MarketSidePendingSwapDB):
     def compare(self, new_swap_id: int, cur_swap_id: int) -> bool:
         new_swap_price = Swap(new_swap_id, self._db).get_inverted_price()
         cur_swap_price = Swap(cur_swap_id, self._db).get_inverted_price()
-        Logger.warning("seller: n, c = %.2f, %.2f" % (new_swap_price, cur_swap_price))
         return new_swap_price > cur_swap_price
 
     def add(self, new_swap_id: int) -> None:
