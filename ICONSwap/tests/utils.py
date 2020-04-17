@@ -30,7 +30,7 @@ from tbears.libs.icon_integrate_test import (SCORE_INSTALL_ADDRESS,
 
 def get_icx_balance(icon_integrate_test_base: IconIntegrateTestBase,
                     address: str,
-                    icon_service: IconService = None) -> str:
+                    icon_service: IconService = None) -> int:
     """Gets ICX coin balance of address
 
     :param icon_integrate_test_base: IconIntegrateTestBase
@@ -50,33 +50,36 @@ def get_icx_balance(icon_integrate_test_base: IconIntegrateTestBase,
         response = e.message
 
     # Sends the call request
-    return response
+    return int(response, 16)
 
-def irc2_transfer(icon_integrate_test_base: IconIntegrateTestBase, 
-    from_: Address, token: str, to_: str, value: int, icon_service: IconService = None):
+
+def irc2_transfer(icon_integrate_test_base: IconIntegrateTestBase,
+                  from_: Address, token: str, to_: str, value: int, icon_service: IconService = None):
     return transaction_call_success(
         icon_integrate_test_base,
         from_=from_,
         to_=token,
         method="transfer",
         params={
-            '_to': to_, 
+            '_to': to_,
             '_value': value
         },
         icon_service=icon_service
     )
 
+
 def get_irc2_balance(icon_integrate_test_base: IconIntegrateTestBase,
-                    address: str, token: str,
-                    icon_service: IconService = None) -> str:
-    return icx_call(
-                icon_integrate_test_base,
-                from_=address,
-                to_=token,
-                method="balanceOf",
-                params={'_owner': address},
-                icon_service=icon_service
-            )
+                     address: str, token: str,
+                     icon_service: IconService = None) -> int:
+    return int(icx_call(
+        icon_integrate_test_base,
+        from_=address,
+        to_=token,
+        method="balanceOf",
+        params={'_owner': address},
+        icon_service=icon_service
+    ), 16)
+
 
 def deploy_score(icon_integrate_test_base: IconIntegrateTestBase,
                  content_as_bytes: bytes,
