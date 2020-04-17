@@ -525,12 +525,12 @@ class UIDLinkedListDB(LinkedListDB):
     def prepend(self, uid: int) -> None:
         super().prepend(uid, uid)
 
-    def append_after(self, value, after_id: int) -> int:
+    def append_after(self, value: int, after_id: int) -> None:
         super().append_after(value, after_id, value)
 
-    def prepend_before(self, value, before_id: int) -> int:
+    def prepend_before(self, value: int, before_id: int) -> None:
         super().prepend_before(value, before_id, value)
 
     def __iter__(self):
-        for node_id, uid in self:
+        for node_id, uid in super().__iter__():
             yield uid
