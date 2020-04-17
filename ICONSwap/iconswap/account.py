@@ -26,7 +26,7 @@ class AccountPendingSwapDB(UIDLinkedListDB):
 
     def __init__(self, address: Address, db: IconScoreDatabase):
         name = f'{str(address)}_{AccountPendingSwapDB._NAME}'
-        super().__init__(name, db, int)
+        super().__init__(name, db)
         self._name = name
 
 
@@ -35,7 +35,7 @@ class AccountFilledSwapDB(UIDLinkedListDB):
 
     def __init__(self, address: Address, db: IconScoreDatabase):
         name = f'{str(address)}_{AccountFilledSwapDB._NAME}'
-        super().__init__(name, db, int)
+        super().__init__(name, db)
         self._name = name
 
 
@@ -45,7 +45,7 @@ class AccountPairPendingSwapDB(UIDLinkedListDB):
     def __init__(self, address: Address, pair: tuple, db: IconScoreDatabase):
         pair_name = MarketPairsDB.get_pair_name(pair)
         name = f'{str(address)}_{pair_name}_{AccountPairPendingSwapDB._NAME}'
-        super().__init__(name, db, int)
+        super().__init__(name, db)
         self._name = name
 
 
@@ -55,5 +55,5 @@ class AccountPairFilledSwapDB(UIDLinkedListDB):
     def __init__(self, address: Address, pair: tuple, db: IconScoreDatabase):
         pair_name = MarketPairsDB.get_pair_name(pair)
         name = f'{str(address)}_{pair_name}_{AccountPairFilledSwapDB._NAME}'
-        super().__init__(name, db, int)
+        super().__init__(name, db)
         self._name = name

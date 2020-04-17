@@ -29,7 +29,7 @@ class _MarketSidePendingSwapDB(UIDLinkedListDB):
 
     def __init__(self, var_key: str, db: IconScoreDatabase):
         name = var_key + _MarketSidePendingSwapDB._NAME
-        super().__init__(name, db, int)
+        super().__init__(name, db)
         self._name = name
         self._db = db
 
@@ -131,7 +131,7 @@ class MarketFilledSwapDB(UIDLinkedListDB):
 
     def __init__(self, pair: tuple, db: IconScoreDatabase):
         name = MarketPairsDB.get_pair_name(pair) + '_' + MarketFilledSwapDB._NAME
-        super().__init__(name, db, int)
+        super().__init__(name, db)
         self._name = name
 
 
