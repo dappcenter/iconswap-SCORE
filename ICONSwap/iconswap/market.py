@@ -21,7 +21,7 @@ from ..scorelib.linked_list import *
 from ..scorelib.set import *
 
 
-class _MarketSidePendingSwapDB(LinkedListDB):
+class _MarketSidePendingSwapDB(UIDLinkedListDB):
     """ _MarketSidePendingSwapDB is a linked list of swaps
         sorted by a given "compare" function
      """
@@ -36,12 +36,12 @@ class _MarketSidePendingSwapDB(LinkedListDB):
     def add(self, new_swap_id: int, compare) -> None:
         """ Iterate through swap list and insert it according to the price """
         # Find positionning in the list for the current item
-        for swap_node_id, cur_swap_id in self:
+        for cur_swap_id in self:
             if compare(new_swap_id, cur_swap_id):
-                self.prepend_before(new_swap_id, swap_node_id, new_swap_id)
+                self.prepend_before(new_swap_id, cur_swap_id)
                 break
         else:
-            self.append(new_swap_id, new_swap_id)
+            self.append(new_swap_id)
 
 
 class _MarketBuyersPendingSwapDB(_MarketSidePendingSwapDB):
@@ -126,7 +126,7 @@ class MarketPendingSwapDB:
             self._sellers.remove(swap_id)
 
 
-class MarketFilledSwapDB(LinkedListDB):
+class MarketFilledSwapDB(UIDLinkedListDB):
     _NAME = 'MARKET_FILLED_SWAP_DB'
 
     def __init__(self, pair: tuple, db: IconScoreDatabase):

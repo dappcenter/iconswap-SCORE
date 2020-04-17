@@ -21,7 +21,7 @@ from ..scorelib.utils import *
 from ..scorelib.linked_list import *
 
 
-class AccountPendingSwapDB(LinkedListDB):
+class AccountPendingSwapDB(UIDLinkedListDB):
     _NAME = 'ACCOUNT_PENDING_SWAP_DB'
 
     def __init__(self, address: Address, db: IconScoreDatabase):
@@ -30,7 +30,7 @@ class AccountPendingSwapDB(LinkedListDB):
         self._name = name
 
 
-class AccountFilledSwapDB(LinkedListDB):
+class AccountFilledSwapDB(UIDLinkedListDB):
     _NAME = 'ACCOUNT_FILLED_SWAP_DB'
 
     def __init__(self, address: Address, db: IconScoreDatabase):
@@ -39,7 +39,7 @@ class AccountFilledSwapDB(LinkedListDB):
         self._name = name
 
 
-class AccountPairPendingSwapDB(LinkedListDB):
+class AccountPairPendingSwapDB(UIDLinkedListDB):
     _NAME = 'ACCOUNT_PAIR_PENDING_SWAP_DB'
 
     def __init__(self, address: Address, pair: tuple, db: IconScoreDatabase):
@@ -49,7 +49,7 @@ class AccountPairPendingSwapDB(LinkedListDB):
         self._name = name
 
 
-class AccountPairFilledSwapDB(LinkedListDB):
+class AccountPairFilledSwapDB(UIDLinkedListDB):
     _NAME = 'ACCOUNT_PAIR_FILLED_SWAP_DB'
 
     def __init__(self, address: Address, pair: tuple, db: IconScoreDatabase):
