@@ -519,16 +519,16 @@ class UIDLinkedListDB(LinkedListDB):
         super().__init__(name, db, int)
         self._name = name
 
-    def append(self, uid: int) -> None:
+    def append(self, uid: int, _: int = None) -> None:
         super().append(uid, uid)
 
-    def prepend(self, uid: int) -> None:
+    def prepend(self, uid: int, _: int = None) -> None:
         super().prepend(uid, uid)
 
-    def append_after(self, value: int, after_id: int) -> None:
+    def append_after(self, value: int, after_id: int, _: int = None) -> None:
         super().append_after(value, after_id, value)
 
-    def prepend_before(self, value: int, before_id: int) -> None:
+    def prepend_before(self, value: int, before_id: int, _: int = None) -> None:
         super().prepend_before(value, before_id, value)
 
     def __iter__(self):
