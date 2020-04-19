@@ -142,7 +142,10 @@ class Swap(object):
             'transaction': self._transaction.get()
         }
 
-    def delete(self) -> None:
+    def __delete__(self) -> None:
+        maker, taker = self.get_orders()
+        del maker
+        del taker
         self._maker_order_id.remove()
         self._taker_order_id.remove()
         self._status.remove()
