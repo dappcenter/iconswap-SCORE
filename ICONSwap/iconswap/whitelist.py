@@ -31,5 +31,5 @@ class Whitelist(SetDB):
 
     def add(self, token: Address) -> None:
         if not token.is_contract:
-            raise InvalidWhitelistContract
+            raise InvalidWhitelistContract(self._NAME, token)
         super().add(token)

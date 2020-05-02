@@ -115,7 +115,7 @@ class TestICONSwap(ICONSwapTests):
             params={'contract': 'hx0000000000000000000000000000000000000000'},
             icon_service=self.icon_service
         )
-        self.assertEqual(result['failure']['message'], 'InvalidWhitelistContract()')
+        self.assertEqual(result['failure']['message'], "InvalidWhitelistContract('WHITELIST', hx0000000000000000000000000000000000000000)")
 
     def test_add_whitelist_not_operator(self):
         # OK
@@ -127,4 +127,4 @@ class TestICONSwap(ICONSwapTests):
             params={'contract': ICX_CONTRACT},
             icon_service=self.icon_service
         )
-        self.assertEqual(result['failure']['message'], 'SenderNotScoreOwnerError()')
+        self.assertEqual(result['failure']['message'], f"SenderNotScoreOwnerError({self._operator.get_address()})")

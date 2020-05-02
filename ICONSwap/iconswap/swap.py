@@ -84,7 +84,10 @@ class Swap(object):
     # ================================================
     def check_status(self, status: int) -> None:
         if self._status.get() != status:
-            raise InvalidSwapStatus
+            raise InvalidSwapStatus(
+                f'{self._name}_{self._uid}',
+                Utils.enum_names(SwapStatus)[self._status.get()],
+                Utils.enum_names(SwapStatus)[status])
 
     def check_maker_address(self, maker_address: Address) -> None:
         maker_provider = Order(self._maker_order_id.get(), self._db).provider()

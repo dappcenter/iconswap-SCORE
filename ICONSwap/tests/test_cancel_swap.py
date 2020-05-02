@@ -194,7 +194,7 @@ class TestICONSwap(ICONSwapTests):
 
         # Error: already swapped
         result = self._cancel_swap_error(self._operator, swap_id)
-        self.assertEqual(result['failure']['message'], 'InvalidSwapStatus()')
+        self.assertEqual(result['failure']['message'], f"InvalidSwapStatus('SWAP_{swap_id}', 'SUCCESS', 'PENDING')")
 
     def test_cancel_icx_irc2_private_swap_already_swapped(self):
         swap_id, maker_id, taker_id = self._create_icx_irc2_swap(100, 200)
@@ -202,7 +202,7 @@ class TestICONSwap(ICONSwapTests):
 
         # Error: already swapped
         result = self._cancel_swap_error(self._operator, swap_id)
-        self.assertEqual(result['failure']['message'], 'InvalidSwapStatus()')
+        self.assertEqual(result['failure']['message'], f"InvalidSwapStatus('SWAP_{swap_id}', 'SUCCESS', 'PENDING')")
 
     def test_cancel_irc2_icx_swap_already_swapped(self):
         swap_id, maker_id, taker_id = self._create_irc2_icx_swap(100, 200)
@@ -210,7 +210,7 @@ class TestICONSwap(ICONSwapTests):
 
         # Error: already swapped
         result = self._cancel_swap_error(self._operator, swap_id)
-        self.assertEqual(result['failure']['message'], 'InvalidSwapStatus()')
+        self.assertEqual(result['failure']['message'], f"InvalidSwapStatus('SWAP_{swap_id}', 'SUCCESS', 'PENDING')")
 
     def test_cancel_irc2_irc2_swap_already_swapped(self):
         swap_id, maker_id, taker_id = self._create_irc2_irc2_swap(100, 200)
@@ -218,7 +218,7 @@ class TestICONSwap(ICONSwapTests):
 
         # Error: already swapped
         result = self._cancel_swap_error(self._operator, swap_id)
-        self.assertEqual(result['failure']['message'], 'InvalidSwapStatus()')
+        self.assertEqual(result['failure']['message'], f"InvalidSwapStatus('SWAP_{swap_id}', 'SUCCESS', 'PENDING')")
 
     def test_cancel_private_swap_taker(self):
         swap_id, maker_id, taker_id = self._create_icx_irc2_swap(100, 200, self._user.get_address())
