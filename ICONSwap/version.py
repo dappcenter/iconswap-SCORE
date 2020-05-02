@@ -23,14 +23,15 @@ class Version(object):
     # ================================================
     #  DB Variables
     # ================================================
-    _VERSION = 'VERSION'
+    _NAME = 'VERSION'
 
     # ================================================
     #  Private Methods
     # ================================================
-    @staticmethod
-    def _version(db: IconScoreDatabase) -> ArrayDB:
-        return VarDB(Version._VERSION, db, value_type=str)
+    def __init__(self, db: IconScoreDatabase):
+        self._name = Version._NAME
+        self._version = VarDB(self._name, db, value_type=str)
+        self._db = db
 
     @staticmethod
     def _as_tuple(version: str):
@@ -42,14 +43,11 @@ class Version(object):
     # ================================================
     #  Public Methods
     # ================================================
-    @staticmethod
-    def set(db: IconScoreDatabase, version: str) -> None:
-        Version._version(db).set(version)
+    def update(self, version: str) -> None:
+        self._version.set(version)
 
-    @staticmethod
-    def get(db: IconScoreDatabase) -> str:
-        return Version._version(db).get()
+    def get(self) -> str:
+        return self._version.get()
 
-    @staticmethod
-    def is_less_than_target_version(last: str, target: str) -> bool:
-        return Version._as_tuple(last) < Version._as_tuple(target)
+    def is_less_than_target_version(self, target: str) -> bool:
+        return Version._as_tuple(self.get()) < Version._as_tuple(target)

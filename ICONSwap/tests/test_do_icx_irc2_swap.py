@@ -48,6 +48,8 @@ class TestICONSwap(ICONSwapTests):
 
         irc2_transfer(super(), from_=self._operator, token=self._irc2_address, to_=self._user.get_address(), value=0x1000000, icon_service=self.icon_service)
         irc2_transfer(super(), from_=self._operator, token=self._irc2_address_2, to_=self._user.get_address(), value=0x1000000, icon_service=self.icon_service)
+        irc2_transfer(super(), from_=self._operator, token=self._irc2_address, to_=self._attacker.get_address(), value=0x1000000, icon_service=self.icon_service)
+        irc2_transfer(super(), from_=self._operator, token=self._irc2_address_2, to_=self._attacker.get_address(), value=0x1000000, icon_service=self.icon_service)
         self._operator_irc2_balance = get_irc2_balance(super(), address=self._operator.get_address(), token=self._irc2_address, icon_service=self.icon_service)
         self._user_irc2_balance = get_irc2_balance(super(), address=self._user.get_address(), token=self._irc2_address, icon_service=self.icon_service)
 
@@ -68,3 +70,29 @@ class TestICONSwap(ICONSwapTests):
 
         self.assertEqual(user_icx_balance, self._user_icx_balance + 100)
         self.assertEqual(user_irc2_balance, self._user_irc2_balance - 200)
+
+    def test_do_icx_irc2_swap_private_ok(self):
+        swap_id, maker_id, taker_id = self._create_icx_irc2_swap(100, 200, self._user.get_address())
+        self._fill_irc2_order_success(self._user, self._irc2_address, swap_id, 200)
+
+        # Check trade status
+        operator_icx_balance = get_icx_balance(super(), address=self._operator.get_address(), icon_service=self.icon_service)
+        user_icx_balance = get_icx_balance(super(), address=self._user.get_address(), icon_service=self.icon_service)
+        operator_irc2_balance = get_irc2_balance(super(), address=self._operator.get_address(), token=self._irc2_address, icon_service=self.icon_service)
+        user_irc2_balance = get_irc2_balance(super(), address=self._user.get_address(), token=self._irc2_address, icon_service=self.icon_service)
+
+        # OK
+        self.assertEqual(operator_icx_balance, self._operator_icx_balance - 100)
+        self.assertEqual(operator_irc2_balance, self._operator_irc2_balance + 200)
+
+        self.assertEqual(user_icx_balance, self._user_icx_balance + 100)
+        self.assertEqual(user_irc2_balance, self._user_irc2_balance - 200)
+
+    def test_do_icx_irc2_swap_private_attacker(self):
+        # Private swap is for user
+        swap_id, maker_id, taker_id = self._create_icx_irc2_swap(100, 200, self._user.get_address())
+        # Attacker tries to fill it
+        result = self._fill_irc2_order_error(self._attacker, self._irc2_address, swap_id, 200)
+        self.assertEqual(result['failure']['message'], f'InvalidOrderProvider({self._user.get_address()}, {self._attacker.get_address()})')
+        # User tries to fill it
+        self._fill_irc2_order_success(self._user, self._irc2_address, swap_id, 200)

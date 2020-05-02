@@ -76,6 +76,31 @@ class TestICONSwap(ICONSwapTests):
         operator_icx_balance = get_icx_balance(super(), address=self._operator.get_address(), icon_service=self.icon_service)
         self.assertEqual(operator_icx_balance, self._operator_icx_balance - 100)
 
+    def test_create_icx_irc2_swap_private_ok(self):
+        self._add_whitelist(ICX_CONTRACT)
+        self._add_whitelist(self._irc2_address)
+
+        # OK
+        result = transaction_call_success(
+            super(),
+            from_=self._operator,
+            to_=self._score_address,
+            method="create_icx_swap",
+            params={
+                'taker_contract': self._irc2_address,
+                'taker_amount': 200,
+                'taker_address': self._user.get_address()
+            },
+            value=100,
+            icon_service=self.icon_service
+        )
+        indexed = result['eventLogs'][0]['indexed']
+        self.assertEqual(indexed[0], 'SwapCreatedEvent(int,int,int)')
+
+        # OK
+        operator_icx_balance = get_icx_balance(super(), address=self._operator.get_address(), icon_service=self.icon_service)
+        self.assertEqual(operator_icx_balance, self._operator_icx_balance - 100)
+
     def test_create_icx_irc2_swap_not_whitelisted(self):
         self._add_whitelist(self._irc2_address)
         # ICX_CONTRACT is not whitelisted

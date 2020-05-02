@@ -77,19 +77,24 @@ class ICONSwapTests(IconIntegrateTestBase):
             icon_service=self.icon_service
         )
 
-    def _create_icx_irc2_swap(self, a1, a2):
+    def _create_icx_irc2_swap(self, a1, a2, taker_address=None):
         self._add_whitelist(ICX_CONTRACT)
         self._add_whitelist(self._irc2_address)
+
+        params = {
+            'taker_contract': self._irc2_address,
+            'taker_amount': a2
+        }
+        if (taker_address):
+            params['taker_address'] = taker_address
+
         # OK
         result = transaction_call_success(
             super(),
             from_=self._operator,
             to_=self._score_address,
             method="create_icx_swap",
-            params={
-                'taker_contract': self._irc2_address,
-                'taker_amount': a2
-            },
+            params=params,
             value=a1,
             icon_service=self.icon_service
         )
@@ -122,9 +127,18 @@ class ICONSwapTests(IconIntegrateTestBase):
     def _fill_irc2_order_error(self, _from, to_, swap_id, amount):
         return self._fill_irc2_order(transaction_call_error, _from, to_, swap_id, amount)
 
-    def _create_irc2_icx_swap(self, a1, a2):
+    def _create_irc2_icx_swap(self, a1, a2, taker_address=None):
         self._add_whitelist(ICX_CONTRACT)
         self._add_whitelist(self._irc2_address)
+
+        data_params = {
+            "action": "create_irc2_swap",
+            "taker_contract": ICX_CONTRACT,
+            "taker_amount": hex(a2),
+        }
+        if (taker_address):
+            data_params['taker_address'] = taker_address
+
         # OK
         result = transaction_call_success(
             super(),
@@ -134,11 +148,7 @@ class ICONSwapTests(IconIntegrateTestBase):
             params={
                 '_to': self._score_address,
                 '_value': a1,
-                '_data': json.dumps({
-                    "action": "create_irc2_swap",
-                    "taker_contract": ICX_CONTRACT,
-                    "taker_amount": hex(a2),
-                }).encode('utf-8')},
+                '_data': json.dumps(data_params).encode('utf-8')},
             icon_service=self.icon_service
         )
 
@@ -148,9 +158,18 @@ class ICONSwapTests(IconIntegrateTestBase):
         maker_id, taker_id = map(lambda x: int(x, 16), result['eventLogs'][0]['data'])
         return swap_id, maker_id, taker_id
 
-    def _create_irc2_irc2_swap(self, a1, a2):
+    def _create_irc2_irc2_swap(self, a1, a2, taker_address=None):
         self._add_whitelist(self._irc2_address)
         self._add_whitelist(self._irc2_address_2)
+
+        data_params = {
+            "action": "create_irc2_swap",
+            "taker_contract": self._irc2_address_2,
+            "taker_amount": hex(a2),
+        }
+        if (taker_address):
+            data_params['taker_address'] = taker_address
+
         # OK
         result = transaction_call_success(
             super(),
@@ -160,11 +179,7 @@ class ICONSwapTests(IconIntegrateTestBase):
             params={
                 '_to': self._score_address,
                 '_value': a1,
-                '_data': json.dumps({
-                    "action": "create_irc2_swap",
-                    "taker_contract": self._irc2_address_2,
-                    "taker_amount": hex(a2),
-                }).encode('utf-8')},
+                '_data': json.dumps(data_params).encode('utf-8')},
             icon_service=self.icon_service
         )
 
@@ -174,8 +189,8 @@ class ICONSwapTests(IconIntegrateTestBase):
         maker_id, taker_id = map(lambda x: int(x, 16), result['eventLogs'][0]['data'])
         return swap_id, maker_id, taker_id
 
-    def _fill_icx_order(self, _from, swap_id, amount):
-        result = transaction_call_success(
+    def _fill_icx_order(self, call, _from, swap_id, amount):
+        return call(
             super(),
             from_=_from,
             to_=self._score_address,
@@ -206,3 +221,9 @@ class ICONSwapTests(IconIntegrateTestBase):
 
     def _fill_irc2_order_error(self, _from, to_, swap_id, amount):
         return self._fill_irc2_order(transaction_call_error, _from, to_, swap_id, amount)
+
+    def _fill_icx_order_success(self, _from, swap_id, amount):
+        return self._fill_icx_order(transaction_call_success, _from, swap_id, amount)
+
+    def _fill_icx_order_error(self, _from, swap_id, amount):
+        return self._fill_icx_order(transaction_call_error, _from, swap_id, amount)

@@ -19,6 +19,8 @@ from .consts import *
 from ..scorelib.id_factory import *
 from ..scorelib.utils import *
 
+EMPTY_ORDER_PROVIDER = Address.from_string("hx0000000000000000000000000000000000000000")
+
 # ================================================
 #  Exception
 # ================================================
@@ -55,13 +57,15 @@ class OrderFactory(IdFactory):
         self._db = db
 
     def create(self, contract: Address,
-               amount: int) -> int:
+               amount: int,
+               provider: Address = EMPTY_ORDER_PROVIDER) -> int:
 
         order_id = self.get_uid()
         order = Order(order_id, self._db)
         order._contract.set(contract)
         order._amount.set(amount)
         order._status.set(OrderStatus.EMPTY)
+        order._provider.set(provider)
         return order_id
 
 
@@ -93,14 +97,18 @@ class Order(object):
     # ================================================
     def check_status(self, status: int) -> None:
         if self._status.get() != status:
-            raise InvalidOrderStatus
+            raise InvalidOrderStatus(
+                f'{self._name}_{self._uid}',
+                Utils.enum_names(OrderStatus)[self._status.get()],
+                Utils.enum_names(OrderStatus)[status])
 
     def check_content(self, contract: Address, amount: int) -> None:
         if (self._contract.get() != contract or self._amount.get() != amount):
             raise InvalidOrderContent
 
     def check_provider(self, provider: Address) -> None:
-        if self._provider.get() != provider:
+        order_provider = self._provider.get()
+        if order_provider != EMPTY_ORDER_PROVIDER and order_provider != provider:
             raise InvalidOrderProvider(self._provider.get(), provider)
 
     # ================================================
@@ -129,7 +137,7 @@ class Order(object):
         self._status.set(OrderStatus.FILLED)
 
     def empty(self) -> None:
-        self._provider.remove()
+        self._provider.set(EMPTY_ORDER_PROVIDER)
         self._status.set(OrderStatus.EMPTY)
 
     def serialize(self) -> dict:

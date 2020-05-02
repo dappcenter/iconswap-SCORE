@@ -79,6 +79,16 @@ class TestICONSwap(ICONSwapTests):
         operator_irc2_balance = get_irc2_balance(super(), address=self._operator.get_address(), token=self._irc2_address, icon_service=self.icon_service)
         self.assertEqual(operator_irc2_balance, self._operator_irc2_balance - 100)
 
+    def test_create_irc2_irc2_swap_private_ok(self):
+        self._add_whitelist(self._irc2_address)
+        self._add_whitelist(self._irc2_address_2)
+
+        result = self._create_irc2_irc2_swap(100, 200, self._user.get_address())
+
+        # OK
+        operator_irc2_balance = get_irc2_balance(super(), address=self._operator.get_address(), token=self._irc2_address, icon_service=self.icon_service)
+        self.assertEqual(operator_irc2_balance, self._operator_irc2_balance - 100)
+
     def test_create_irc2_irc2_swap_not_whitelisted(self):
         self._add_whitelist(self._irc2_address)
         # self._irc2_address_2 is not whitelisted

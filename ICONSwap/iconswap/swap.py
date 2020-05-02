@@ -29,18 +29,6 @@ class InvalidSwapStatus(Exception):
     pass
 
 
-class InvalidMakerAddress(Exception):
-    pass
-
-
-class InvalidSwapProvider(Exception):
-    pass
-
-
-class SwapDoesntExist(Exception):
-    pass
-
-
 class SwapFactory(IdFactory):
 
     _NAME = 'SWAP_FACTORY'
@@ -99,8 +87,9 @@ class Swap(object):
             raise InvalidSwapStatus
 
     def check_maker_address(self, maker_address: Address) -> None:
-        if Order(self._maker_order_id.get(), self._db).provider() != maker_address:
-            raise InvalidMakerAddress
+        maker_provider = Order(self._maker_order_id.get(), self._db).provider()
+        if maker_provider != maker_address:
+            raise InvalidOrderProvider(maker_provider, maker_address)
 
     # ================================================
     #  Public Methods
@@ -129,6 +118,10 @@ class Swap(object):
     def get_inverted_price(self) -> float:
         maker, taker = self.get_orders()
         return taker.amount() / maker.amount()
+
+    def is_private(self) -> bool:
+        maker, taker = self.get_orders()
+        return taker.provider() != EMPTY_ORDER_PROVIDER
 
     def serialize(self) -> dict:
         maker, taker = self.get_orders()

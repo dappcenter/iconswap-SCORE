@@ -73,11 +73,25 @@ class ICONSwap(IconScoreBase):
     def on_install(self) -> None:
         super().on_install()
         SCOREMaintenance(self.db).disable()
-        Version.set(self.db, VERSION)
+        Version(self.db).set(VERSION)
 
     def on_update(self) -> None:
         super().on_update()
-        Version.set(self.db, VERSION)
+
+        version = Version(self.db)
+
+        if version.is_less_than_target_version('0.4.0'):
+            self._migrate_v0_4_0()
+
+        version.update(VERSION)
+
+    def _migrate_v0_4_0(self) -> None:
+        # 'None' taker order provider field needs to be updated to EMPTY_ORDER_PROVIDER
+        for swap_id in SystemSwapDB(self.db):
+            swap = Swap(swap_id, self.db)
+            maker, taker = swap.get_orders()
+            if taker.provider() == None and taker.status() in [OrderStatus.EMPTY, OrderStatus.CANCELLED]:
+                taker._provider.set(EMPTY_ORDER_PROVIDER)
 
     # ================================================
     #  Internal methods
@@ -126,34 +140,18 @@ class ICONSwap(IconScoreBase):
         # Check if taker order is empty
         taker.check_status(OrderStatus.EMPTY)
 
+        # Check if taker address is correct, if filled
+        taker.check_provider(taker_address)
+
         # Check taker order content
         taker.check_content(taker_contract, taker_amount)
 
         # --- OK from here
+        # Swap needs to be checked for private *before* the taker order is filled
+        is_private_swap = swap.is_private()
 
-        # Fill the order
+        # Fill the taker order
         taker.fill(taker_address)
-
-        # Trigger events
-        self.OrderFilledEvent(taker.id())
-
-        # Both orders are filled : do the swap
-        self._do_swap(swap_id)
-
-    def _do_swap(self, swap_id: int) -> None:
-        # Check if swap exists
-        SystemSwapDB(self.db).check_exists(swap_id)
-        swap = Swap(swap_id, self.db)
-
-        # Check if the swap is pending
-        swap.check_status(SwapStatus.PENDING)
-
-        # Check if the orders are filled
-        maker, taker = swap.get_orders()
-        maker.check_status(OrderStatus.FILLED)
-        taker.check_status(OrderStatus.FILLED)
-
-        # --- OK from here
         pair = (maker.contract(), taker.contract())
 
         # Trade the tokens
@@ -170,20 +168,23 @@ class ICONSwap(IconScoreBase):
         # Remove the swap from the pending lists
         AccountPendingSwapDB(maker.provider(), self.db).remove(swap_id)
         AccountPairPendingSwapDB(maker.provider(), pair, self.db).remove(swap_id)
-        MarketPendingSwapDB(pair, self.db).remove(swap_id)
+        if not is_private_swap:
+            MarketPendingSwapDB(pair, self.db).remove(swap_id)
 
         # Add the swap to filled lists
         AccountFilledSwapDB(maker.provider(), self.db).prepend(swap_id)
         AccountFilledSwapDB(taker.provider(), self.db).prepend(swap_id)
         AccountPairFilledSwapDB(maker.provider(), pair, self.db).prepend(swap_id)
         AccountPairFilledSwapDB(taker.provider(), pair, self.db).prepend(swap_id)
-        MarketFilledSwapDB(pair, self.db).prepend(swap_id)
+        if not is_private_swap:
+            MarketFilledSwapDB(pair, self.db).prepend(swap_id)
 
         # Set the orders as successful
         maker.set_status(OrderStatus.SUCCESS)
         taker.set_status(OrderStatus.SUCCESS)
 
         # Trigger events
+        self.OrderFilledEvent(taker.id())
         self.SwapSuccessEvent(swap_id)
 
     def _create_swap(self,
@@ -191,7 +192,8 @@ class ICONSwap(IconScoreBase):
                      maker_amount: int,
                      taker_contract: Address,
                      taker_amount: int,
-                     maker_address: Address) -> None:
+                     maker_address: Address,
+                     taker_address: Address) -> None:
         # Input checks
         self._check_contract(maker_contract)
         self._check_contract(taker_contract)
@@ -205,26 +207,29 @@ class ICONSwap(IconScoreBase):
         # Create orders and swap
         order_factory = OrderFactory(self.db)
         maker_id = order_factory.create(maker_contract, maker_amount)
-        taker_id = order_factory.create(taker_contract, taker_amount)
+        taker_id = order_factory.create(taker_contract, taker_amount, taker_address)
         swap_id = SwapFactory(self.db).create(maker_id, taker_id, self.now(), maker_address)
+        swap = Swap(swap_id, self.db)
 
-        # Add to DB
+        # Add to DBs
         system_order_db = SystemOrderDB(self.db)
         system_order_db.add(maker_id)
         system_order_db.add(taker_id)
-
-        MarketPendingSwapDB(pair, self.db).add(swap_id)
-
         SystemSwapDB(self.db).add(swap_id)
+
+        if not swap.is_private():
+            # Market is only for public swaps
+            MarketPendingSwapDB(pair, self.db).add(swap_id)
+
+            # Create the market pair if it didn't exist yet
+            market_pairs_db = MarketPairsDB(self.db)
+            if not pair in market_pairs_db:
+                # The max pairs count here is combination(whitelist_count, 2) (nCr, r=2)
+                # It should be fine as long as the number of tokens is < 50 (1225 iterations)
+                market_pairs_db.add(pair)
+
         AccountPendingSwapDB(maker_address, self.db).prepend(swap_id)
         AccountPairPendingSwapDB(maker_address, pair, self.db).prepend(swap_id)
-
-        # Create the market pair if it didn't exist yet
-        market_pairs_db = MarketPairsDB(self.db)
-        if not pair in market_pairs_db:
-            # The max pairs count here is combination(whitelist_count, 2) (nCr, r=2)
-            # It should be fine as long as the number of tokens is < 50 (1225 iterations)
-            market_pairs_db.add(pair)
 
         # Funds have been sent for maker
         maker = Order(maker_id, self.db)
@@ -296,7 +301,8 @@ class ICONSwap(IconScoreBase):
             maker_address = _from
             taker_contract = Address.from_string(params['taker_contract'])
             taker_amount = int(params['taker_amount'], 16)
-            self._create_swap(maker_contract, maker_amount, taker_contract, taker_amount, maker_address)
+            taker_address = Address.from_string(params['taker_address']) if 'taker_address' in params else EMPTY_ORDER_PROVIDER
+            self._create_swap(maker_contract, maker_amount, taker_contract, taker_amount, maker_address, taker_address)
 
         elif params['action'] == 'fill_irc2_order':
             taker_contract = self.msg.sender
@@ -312,10 +318,10 @@ class ICONSwap(IconScoreBase):
     @check_maintenance
     @external
     @payable
-    def create_icx_swap(self, taker_contract: Address, taker_amount: int) -> None:
+    def create_icx_swap(self, taker_contract: Address, taker_amount: int, taker_address: Address = EMPTY_ORDER_PROVIDER) -> None:
         maker_address = self.msg.sender
         maker_amount = self.msg.value
-        self._create_swap(ZERO_SCORE_ADDRESS, maker_amount, taker_contract, taker_amount, maker_address)
+        self._create_swap(ZERO_SCORE_ADDRESS, maker_amount, taker_contract, taker_amount, maker_address, taker_address)
 
     def _cancel_swap(self, swap: Swap) -> None:
         # Swap must be pending
@@ -343,7 +349,10 @@ class ICONSwap(IconScoreBase):
         # Remove swap from lists
         AccountPendingSwapDB(maker_address, self.db).remove(swap.id())
         AccountPairPendingSwapDB(maker_address, pair, self.db).remove(swap.id())
-        MarketPendingSwapDB(pair, self.db).remove(swap.id())
+
+        if not swap.is_private():
+            # Market is only for public swaps
+            MarketPendingSwapDB(pair, self.db).remove(swap.id())
 
         # Set the orders as unavailable
         maker.set_status(OrderStatus.CANCELLED)
@@ -359,7 +368,8 @@ class ICONSwap(IconScoreBase):
         swap = Swap(swap_id, self.db)
 
         # Only the maker can cancel the swap
-        swap.check_maker_address(self.msg.sender)
+        maker, taker = swap.get_orders()
+        maker.check_provider(self.msg.sender)
 
         self._cancel_swap(swap)
 

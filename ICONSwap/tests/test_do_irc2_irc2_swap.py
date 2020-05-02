@@ -70,3 +70,11 @@ class TestICONSwap(ICONSwapTests):
 
         self.assertEqual(user_irc2_balance, self._user_irc2_balance + 100)
         self.assertEqual(user_irc2_balance_2, self._user_irc2_balance_2 - 200)
+
+    def test_do_irc2_irc2_swap_private_attacker(self):
+        # Private swap is for user
+        swap_id, maker_id, taker_id = self._create_irc2_irc2_swap(100, 200, self._user.get_address())
+        # Attacker tries to fill it
+        self._fill_irc2_order_error(self._attacker, self._irc2_address_2, swap_id, 200)
+        # User tries to fill it
+        self._fill_irc2_order_success(self._user, self._irc2_address_2, swap_id, 200)
