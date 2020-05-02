@@ -92,7 +92,7 @@ class Swap(object):
     def check_maker_address(self, maker_address: Address) -> None:
         maker_provider = Order(self._maker_order_id.get(), self._db).provider()
         if maker_provider != maker_address:
-            raise InvalidOrderProvider(maker_provider, maker_address)
+            raise InvalidOrderProvider(maker_provider)
 
     # ================================================
     #  Public Methods

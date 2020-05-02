@@ -223,12 +223,12 @@ class TestICONSwap(ICONSwapTests):
     def test_cancel_private_swap_taker(self):
         swap_id, maker_id, taker_id = self._create_icx_irc2_swap(100, 200, self._user.get_address())
         result = self._cancel_swap_error(self._user, swap_id)
-        self.assertEqual(result['failure']['message'], f'InvalidOrderProvider({self._operator.get_address()}, {self._user.get_address()})')
+        self.assertEqual(result['failure']['message'], f'InvalidOrderProvider({self._operator.get_address()})')
 
     def test_cancel_swap_attacker(self):
         swap_id, maker_id, taker_id = self._create_icx_irc2_swap(100, 200)
         result = self._cancel_swap_error(self._attacker, swap_id)
-        self.assertEqual(result['failure']['message'], f'InvalidOrderProvider({self._operator.get_address()}, {self._attacker.get_address()})')
+        self.assertEqual(result['failure']['message'], f'InvalidOrderProvider({self._operator.get_address()})')
 
     def test_cancel_after_swap_success(self):
         swap_id, maker_id, taker_id = self._create_irc2_irc2_swap(100, 200)

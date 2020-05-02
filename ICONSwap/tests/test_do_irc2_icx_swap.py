@@ -78,6 +78,6 @@ class TestICONSwap(ICONSwapTests):
         swap_id, maker_id, taker_id = self._create_irc2_icx_swap(100, 200, self._user.get_address())
         # Attacker tries to fill it
         result = self._fill_icx_order_error(self._attacker, swap_id, 200)
-        self.assertEqual(result['failure']['message'], f'InvalidOrderProvider({self._user.get_address()}, {self._attacker.get_address()})')
+        self.assertEqual(result['failure']['message'], f'InvalidOrderProvider({self._user.get_address()})')
         # User tries to fill it
         self._fill_icx_order_success(self._user, swap_id, 200)

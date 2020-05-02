@@ -109,7 +109,7 @@ class Order(object):
     def check_provider(self, provider: Address) -> None:
         order_provider = self._provider.get()
         if order_provider != EMPTY_ORDER_PROVIDER and order_provider != provider:
-            raise InvalidOrderProvider(self._provider.get(), provider)
+            raise InvalidOrderProvider(self._provider.get())
 
     # ================================================
     #  Public Methods
