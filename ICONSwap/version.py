@@ -51,3 +51,6 @@ class Version(object):
 
     def is_less_than_target_version(self, target: str) -> bool:
         return Version._as_tuple(self.get()) < Version._as_tuple(target)
+
+    def __delete__(self) -> None:
+        self._version.remove()
