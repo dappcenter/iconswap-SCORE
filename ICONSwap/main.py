@@ -85,6 +85,9 @@ class ICONSwap(IconScoreBase):
 
         version.update(VERSION)
 
+    # ================================================
+    #  Migration methods
+    # ================================================
     def _migrate_v0_4_0(self) -> None:
         # 'None' taker order provider field needs to be updated to EMPTY_ORDER_PROVIDER
         for swap_id in SystemSwapDB(self.db):
@@ -239,6 +242,42 @@ class ICONSwap(IconScoreBase):
         self.SwapCreatedEvent(swap_id, maker_id, taker_id)
         self.OrderFilledEvent(maker_id)
 
+    def _cancel_swap(self, swap: Swap) -> None:
+        # Swap must be pending
+        swap.check_status(SwapStatus.PENDING)
+
+        # -- OK from here
+        # Get the orders associated with the swap
+        maker, taker = swap.get_orders()
+        pair = (maker.contract(), taker.contract())
+        maker_address = maker.provider()
+
+        # Refund if filled
+        if maker.status() == OrderStatus.FILLED:
+            self._refund_order(maker)
+            self.OrderRefundedEvent(maker.id())
+
+        if taker.status() == OrderStatus.FILLED:
+            self._refund_order(taker)
+            self.OrderRefundedEvent(taker.id())
+
+        # Set the swap status as unavailable
+        swap.set_status(SwapStatus.CANCELLED)
+        swap.set_transaction(self.tx.hash.hex())
+
+        # Remove swap from lists
+        AccountPendingSwapDB(maker_address, self.db).remove(swap.id())
+        AccountPairPendingSwapDB(maker_address, pair, self.db).remove(swap.id())
+
+        if not swap.is_private():
+            # Market is only for public swaps
+            MarketPendingSwapDB(pair, self.db).remove(swap.id())
+
+        # Set the orders as unavailable
+        maker.set_status(OrderStatus.CANCELLED)
+        taker.set_status(OrderStatus.CANCELLED)
+        self.SwapCancelledEvent(swap.id())
+
     # ================================================
     #  Checks
     # ================================================
@@ -322,42 +361,6 @@ class ICONSwap(IconScoreBase):
         maker_address = self.msg.sender
         maker_amount = self.msg.value
         self._create_swap(ZERO_SCORE_ADDRESS, maker_amount, taker_contract, taker_amount, maker_address, taker_address)
-
-    def _cancel_swap(self, swap: Swap) -> None:
-        # Swap must be pending
-        swap.check_status(SwapStatus.PENDING)
-
-        # -- OK from here
-        # Get the orders associated with the swap
-        maker, taker = swap.get_orders()
-        pair = (maker.contract(), taker.contract())
-        maker_address = maker.provider()
-
-        # Refund if filled
-        if maker.status() == OrderStatus.FILLED:
-            self._refund_order(maker)
-            self.OrderRefundedEvent(maker.id())
-
-        if taker.status() == OrderStatus.FILLED:
-            self._refund_order(taker)
-            self.OrderRefundedEvent(taker.id())
-
-        # Set the swap status as unavailable
-        swap.set_status(SwapStatus.CANCELLED)
-        swap.set_transaction(self.tx.hash.hex())
-
-        # Remove swap from lists
-        AccountPendingSwapDB(maker_address, self.db).remove(swap.id())
-        AccountPairPendingSwapDB(maker_address, pair, self.db).remove(swap.id())
-
-        if not swap.is_private():
-            # Market is only for public swaps
-            MarketPendingSwapDB(pair, self.db).remove(swap.id())
-
-        # Set the orders as unavailable
-        maker.set_status(OrderStatus.CANCELLED)
-        taker.set_status(OrderStatus.CANCELLED)
-        self.SwapCancelledEvent(swap.id())
 
     @catch_error
     @check_maintenance
