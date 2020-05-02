@@ -73,7 +73,7 @@ class ICONSwap(IconScoreBase):
     def on_install(self) -> None:
         super().on_install()
         SCOREMaintenance(self.db).disable()
-        Version(self.db).set(VERSION)
+        Version(self.db).update(VERSION)
 
     def on_update(self) -> None:
         super().on_update()
