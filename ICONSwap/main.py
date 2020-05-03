@@ -529,6 +529,11 @@ class ICONSwap(IconScoreBase):
     def maintenance_enabled(self) -> bool:
         return SCOREMaintenance(self.db).is_enabled()
 
+    @catch_error
+    @external(readonly=True)
+    def get_version(self) -> str:
+        return Version(self.db).get()
+
     # ================================================
     #  Operator methods
     # ================================================
