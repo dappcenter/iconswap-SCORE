@@ -534,6 +534,10 @@ class ICONSwap(IconScoreBase):
     def get_version(self) -> str:
         return Version(self.db).get()
 
+    @external(readonly=True)
+    def name(self) -> str:
+        return "ICONSwap"
+
     # ================================================
     #  Operator methods
     # ================================================
