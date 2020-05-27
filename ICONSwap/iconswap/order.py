@@ -103,8 +103,8 @@ class Order(object):
                 Utils.enum_names(OrderStatus)[status])
 
     def check_content(self, contract: Address, amount: int) -> None:
-        if (self._contract.get() != contract or self._amount.get() != amount):
-            raise InvalidOrderContent
+        if (self._contract.get() != contract or self._amount.get() < amount or amount <= 0):
+            raise InvalidOrderContent(self._contract.get(), self._amount.get())
 
     def check_provider(self, provider: Address) -> None:
         order_provider = self._provider.get()
@@ -135,6 +135,9 @@ class Order(object):
     def fill(self, provider: Address) -> None:
         self._provider.set(provider)
         self._status.set(OrderStatus.FILLED)
+
+    def partial_fill(self, amount: int) -> None:
+        self._amount.set(self._amount.get() - amount)
 
     def empty(self) -> None:
         self._provider.set(EMPTY_ORDER_PROVIDER)

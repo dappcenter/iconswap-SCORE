@@ -64,6 +64,10 @@ class ICONSwap(IconScoreBase):
     def OrderRefundedEvent(self, order_id: int) -> None:
         pass
 
+    @eventlog
+    def ShowException(self, exception: str):
+        pass
+
     # ================================================
     #  Initialization
     # ================================================
@@ -118,6 +122,25 @@ class ICONSwap(IconScoreBase):
     def _is_icx(self, order: Order) -> bool:
         return order.contract() == ZERO_SCORE_ADDRESS
 
+    def _do_partial_fill_swap(self, swap: Swap, taker_partial_amount: int, taker_address: Address) -> None:
+        maker, taker = swap.get_orders()
+
+        # Split the swaps
+        maker_partial_amount = (taker_partial_amount * maker.amount()) // taker.amount()
+
+        # Create a partial swap and fill it
+        partial_swap = self._create_swap(maker.contract(),
+                                         maker_partial_amount,
+                                         taker.contract(),
+                                         taker_partial_amount,
+                                         maker.provider(),
+                                         taker_address)
+        self._do_full_fill_swap(partial_swap, taker_address)
+
+        # Adjust the amount of the remaining existing swap
+        maker.partial_fill(maker_partial_amount)
+        taker.partial_fill(taker_partial_amount)
+
     def _fill_swap(self, swap_id: int, taker_contract: Address, taker_amount: int, taker_address: Address) -> None:
         """
             swap_id: The swap UID
@@ -150,8 +173,15 @@ class ICONSwap(IconScoreBase):
         taker.check_content(taker_contract, taker_amount)
 
         # --- OK from here
+        if taker_amount < taker.amount():
+            self._do_partial_fill_swap(swap, taker_amount, taker_address)
+        else:
+            self._do_full_fill_swap(swap, taker_address)
+
+    def _do_full_fill_swap(self, swap: Swap, taker_address: Address) -> None:
         # Swap needs to be checked for private *before* the taker order is filled
         is_private_swap = swap.is_private()
+        maker, taker = swap.get_orders()
 
         # Fill the taker order
         taker.fill(taker_address)
@@ -169,18 +199,18 @@ class ICONSwap(IconScoreBase):
         swap.set_timestamp_swap(self.now())
 
         # Remove the swap from the pending lists
-        AccountPendingSwapDB(maker.provider(), self.db).remove(swap_id)
-        AccountPairPendingSwapDB(maker.provider(), pair, self.db).remove(swap_id)
+        AccountPendingSwapDB(maker.provider(), self.db).remove(swap.id())
+        AccountPairPendingSwapDB(maker.provider(), pair, self.db).remove(swap.id())
         if not is_private_swap:
-            MarketPendingSwapDB(pair, self.db).remove(swap_id)
+            MarketPendingSwapDB(pair, self.db).remove(swap.id())
 
         # Add the swap to filled lists
-        AccountFilledSwapDB(maker.provider(), self.db).prepend(swap_id)
-        AccountFilledSwapDB(taker.provider(), self.db).prepend(swap_id)
-        AccountPairFilledSwapDB(maker.provider(), pair, self.db).prepend(swap_id)
-        AccountPairFilledSwapDB(taker.provider(), pair, self.db).prepend(swap_id)
+        AccountFilledSwapDB(maker.provider(), self.db).prepend(swap.id())
+        AccountFilledSwapDB(taker.provider(), self.db).prepend(swap.id())
+        AccountPairFilledSwapDB(maker.provider(), pair, self.db).prepend(swap.id())
+        AccountPairFilledSwapDB(taker.provider(), pair, self.db).prepend(swap.id())
         if not is_private_swap:
-            MarketFilledSwapDB(pair, self.db).prepend(swap_id)
+            MarketFilledSwapDB(pair, self.db).prepend(swap.id())
 
         # Set the orders as successful
         maker.set_status(OrderStatus.SUCCESS)
@@ -188,7 +218,7 @@ class ICONSwap(IconScoreBase):
 
         # Trigger events
         self.OrderFilledEvent(taker.id())
-        self.SwapSuccessEvent(swap_id)
+        self.SwapSuccessEvent(swap.id())
 
     def _create_swap(self,
                      maker_contract: Address,
@@ -196,7 +226,7 @@ class ICONSwap(IconScoreBase):
                      taker_contract: Address,
                      taker_amount: int,
                      maker_address: Address,
-                     taker_address: Address) -> None:
+                     taker_address: Address) -> Swap:
         # Input checks
         self._check_contract(maker_contract)
         self._check_contract(taker_contract)
@@ -241,6 +271,7 @@ class ICONSwap(IconScoreBase):
         # Trigger events
         self.SwapCreatedEvent(swap_id, maker_id, taker_id)
         self.OrderFilledEvent(maker_id)
+        return swap
 
     def _cancel_swap(self, swap: Swap) -> None:
         # Swap must be pending
@@ -282,8 +313,8 @@ class ICONSwap(IconScoreBase):
     #  Checks
     # ================================================
     def _check_amount(self, amount: int) -> None:
-        if amount == 0:
-            raise InvalidOrderAmount
+        if amount <= 0:
+            raise InvalidOrderAmount(amount)
 
     def _check_contract(self, address: Address) -> None:
         if not address.is_contract:
@@ -292,7 +323,7 @@ class ICONSwap(IconScoreBase):
 
     def _check_different_contract(self, contract1: Address, contract2: Address) -> None:
         if contract1 == contract2:
-            raise InvalidOrderContract
+            raise InvalidOrderContract(contract1, contract2)
 
     # ================================================
     #  External methods

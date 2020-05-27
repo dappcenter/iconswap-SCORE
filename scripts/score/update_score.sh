@@ -15,10 +15,14 @@ function process {
     fi
 
     command=$(cat <<-COMMAND
+    mkdir tmp_deploy;
+    mv $(get_package_name)/tests tmp_deploy/;
     tbears deploy $(get_package_name)
         -m update
         -o $(cat ./config/${network}/score_address.txt)
-        -c ./config/${network}/tbears_cli_config.json
+        -c ./config/${network}/tbears_cli_config.json;
+    mv tmp_deploy/tests $(get_package_name)/;
+    rmdir tmp_deploy;
 COMMAND
 )
 

@@ -4,7 +4,7 @@
     "keyStore": "./config/yeouido/keystores/operator.icx",
     "to": "cx0000000000000000000000000000000000000000",
     "deploy": {
-        "stepLimit": "0x19a000000",
+        "stepLimit": "0xb2d05e00",
         "contentType": "zip",
         "mode": "install",
         "scoreParams": {}

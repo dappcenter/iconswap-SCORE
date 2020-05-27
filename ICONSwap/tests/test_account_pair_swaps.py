@@ -102,7 +102,7 @@ class TestICONSwap(ICONSwapTests):
         self.assertTrue(len(account_pending) == 3)
         self.assertTrue(len(account_filled) == 2)
 
-        print("market_sellers =====================")
-        print(json.dumps(account_pending, indent=4))
+        # print("market_sellers =====================")
+        # print(json.dumps(account_pending, indent=4))
         self.assertTrue(account_pending[0]['maker']['amount'] == 20)
         self.assertTrue(account_pending[0]['taker']['amount'] == 30)

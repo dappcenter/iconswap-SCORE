@@ -111,7 +111,7 @@ class TestICONSwap(ICONSwapTests):
 
         # Amount cannot be zero
         result = self.create_irc2_icx_swap_error(0, 200)
-        self.assertEqual(result['failure']['message'], 'InvalidOrderAmount()')
+        self.assertEqual(result['failure']['message'], 'InvalidOrderAmount(0)')
 
     def test_create_irc2_icx_swap_zero_amount_2(self):
         self._add_whitelist(self._irc2_address)
@@ -119,7 +119,7 @@ class TestICONSwap(ICONSwapTests):
 
         # Amount cannot be zero
         result = self.create_irc2_icx_swap_error(100, 0)
-        self.assertEqual(result['failure']['message'], 'InvalidOrderAmount()')
+        self.assertEqual(result['failure']['message'], 'InvalidOrderAmount(0)')
 
     def test_create_irc2_icx_swap_badaddr(self):
         self._add_whitelist(self._irc2_address)

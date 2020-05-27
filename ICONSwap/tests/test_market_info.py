@@ -75,7 +75,7 @@ class TestICONSwap(ICONSwapTests):
             icon_service=self.icon_service
         )
 
-        print(market_info)
+        # print(market_info)
 
         market_sellers = icx_call(
             super(),
@@ -86,8 +86,8 @@ class TestICONSwap(ICONSwapTests):
             icon_service=self.icon_service
         )
 
-        print("SELLERS =======================")
-        print(json.dumps(market_sellers, indent=4))
+        # print("SELLERS =======================")
+        # print(json.dumps(market_sellers, indent=4))
         self.assertEqual(market_sellers[0]['maker']['amount'], 10)
         self.assertEqual(market_sellers[0]['taker']['amount'], 20)
         self.assertEqual(market_sellers[1]['maker']['amount'], 100)
@@ -104,8 +104,8 @@ class TestICONSwap(ICONSwapTests):
             icon_service=self.icon_service
         )
 
-        print("BUYERS =======================")
-        print(json.dumps(market_buyers, indent=4))
+        # print("BUYERS =======================")
+        # print(json.dumps(market_buyers, indent=4))
         self.assertEqual(market_buyers[0]['maker']['amount'], 20)
         self.assertEqual(market_buyers[0]['taker']['amount'], 30)
         self.assertEqual(market_buyers[1]['maker']['amount'], 10)
@@ -123,7 +123,7 @@ class TestICONSwap(ICONSwapTests):
             icon_service=self.icon_service
         )
 
-        print(json.dumps(filled_swaps, indent=4))
+        # print(json.dumps(filled_swaps, indent=4))
         self.assertEqual(filled_swaps[0]['maker']['amount'], 100)
         self.assertEqual(filled_swaps[0]['taker']['amount'], 200)
         self.assertEqual(filled_swaps[1]['maker']['amount'], 10)

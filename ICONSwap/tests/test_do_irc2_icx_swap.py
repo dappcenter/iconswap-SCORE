@@ -73,6 +73,49 @@ class TestICONSwap(ICONSwapTests):
         self.assertEqual(user_icx_balance, self._user_icx_balance - 200)
         self.assertEqual(user_irc2_balance, self._user_irc2_balance + 100)
 
+    def test_do_irc2_icx_swap_partial_ok(self):
+        maker = 100
+        taker = 200
+        swap_id, maker_id, taker_id = self._create_irc2_icx_swap(maker, taker)
+        ratio = 1 / 2
+        taker_ratio = int(taker * ratio)
+        maker_ratio = int(maker * ratio)
+        self._fill_icx_order_success(self._user, swap_id, taker_ratio)
+
+        # Check trade status
+        operator_icx_balance = get_icx_balance(super(), address=self._operator.get_address(), icon_service=self.icon_service)
+        user_icx_balance = get_icx_balance(super(), address=self._user.get_address(), icon_service=self.icon_service)
+        operator_irc2_balance = get_irc2_balance(super(), address=self._operator.get_address(), token=self._irc2_address, icon_service=self.icon_service)
+        user_irc2_balance = get_irc2_balance(super(), address=self._user.get_address(), token=self._irc2_address, icon_service=self.icon_service)
+
+        # OK
+        self.assertEqual(operator_irc2_balance, self._operator_irc2_balance - maker)
+        self.assertEqual(operator_icx_balance, self._operator_icx_balance + taker_ratio)
+        self.assertEqual(user_irc2_balance, self._user_irc2_balance + maker_ratio)
+        self.assertEqual(user_icx_balance, self._user_icx_balance - taker_ratio)
+
+    def test_do_irc2_icx_swap_partial_and_cancel_ok(self):
+        maker = 100
+        taker = 200
+        swap_id, maker_id, taker_id = self._create_irc2_icx_swap(maker, taker)
+        ratio = 1 / 3
+        taker_ratio = int(taker * ratio)
+        maker_ratio = int(maker * ratio)
+        self._fill_icx_order_success(self._user, swap_id, taker_ratio)
+        self._cancel_swap(swap_id)
+
+        # Check trade status
+        operator_icx_balance = get_icx_balance(super(), address=self._operator.get_address(), icon_service=self.icon_service)
+        user_icx_balance = get_icx_balance(super(), address=self._user.get_address(), icon_service=self.icon_service)
+        operator_irc2_balance = get_irc2_balance(super(), address=self._operator.get_address(), token=self._irc2_address, icon_service=self.icon_service)
+        user_irc2_balance = get_irc2_balance(super(), address=self._user.get_address(), token=self._irc2_address, icon_service=self.icon_service)
+
+        # OK
+        self.assertEqual(operator_irc2_balance, self._operator_irc2_balance - maker_ratio)
+        self.assertEqual(operator_icx_balance, self._operator_icx_balance + taker_ratio)
+        self.assertEqual(user_irc2_balance, self._user_irc2_balance + maker_ratio)
+        self.assertEqual(user_icx_balance, self._user_icx_balance - taker_ratio)
+
     def test_do_irc2_icx_swap_private_attacker(self):
         # Private swap is for user
         swap_id, maker_id, taker_id = self._create_irc2_icx_swap(100, 200, self._user.get_address())

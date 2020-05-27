@@ -227,3 +227,13 @@ class ICONSwapTests(IconIntegrateTestBase):
 
     def _fill_icx_order_error(self, _from, swap_id, amount):
         return self._fill_icx_order(transaction_call_error, _from, swap_id, amount)
+
+    def _cancel_swap(self, swap_id):
+        return transaction_call_success(
+            super(),
+            from_=self._operator,
+            to_=self._score_address,
+            method="cancel_swap",
+            params={"swap_id": swap_id},
+            icon_service=self.icon_service
+        )

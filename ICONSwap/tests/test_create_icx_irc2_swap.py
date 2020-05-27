@@ -154,7 +154,7 @@ class TestICONSwap(ICONSwapTests):
             value=0,
             icon_service=self.icon_service
         )
-        self.assertEqual(result['failure']['message'], 'InvalidOrderAmount()')
+        self.assertEqual(result['failure']['message'], 'InvalidOrderAmount(0)')
 
     def test_create_icx_irc2_swap_zero_amount_2(self):
         self._add_whitelist(ICX_CONTRACT)
@@ -173,7 +173,7 @@ class TestICONSwap(ICONSwapTests):
             value=100,
             icon_service=self.icon_service
         )
-        self.assertEqual(result['failure']['message'], 'InvalidOrderAmount()')
+        self.assertEqual(result['failure']['message'], 'InvalidOrderAmount(0)')
 
     def test_create_icx_irc2_swap_badaddr(self):
         self._add_whitelist(ICX_CONTRACT)
