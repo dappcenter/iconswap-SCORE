@@ -536,7 +536,7 @@ class ICONSwap(IconScoreBase):
 
     @external(readonly=True)
     def name(self) -> str:
-        return "ICONSwap"
+        return ICONSwap._NAME
 
     # ================================================
     #  Operator methods
