@@ -111,7 +111,7 @@ class MarketPendingSwapDB:
         swap = Swap(new_swap_id, self._db)
         maker, taker = swap.get_orders()
         pair = (maker.contract(), taker.contract())
-        if MarketPairsDB.is_buyer(pair, maker):
+        if MarketPairsDB.is_buyer(pair, maker.contract()):
             self._buyers.add(new_swap_id)
         else:
             self._sellers.add(new_swap_id)
@@ -120,7 +120,7 @@ class MarketPendingSwapDB:
         swap = Swap(swap_id, self._db)
         maker, taker = swap.get_orders()
         pair = (maker.contract(), taker.contract())
-        if MarketPairsDB.is_buyer(pair, maker):
+        if MarketPairsDB.is_buyer(pair, maker.contract()):
             self._buyers.remove(swap_id)
         else:
             self._sellers.remove(swap_id)
@@ -139,9 +139,9 @@ class MarketPairsDB(SetDB):
     _NAME = 'MARKET_PAIRS_DB'
 
     @staticmethod
-    def is_buyer(pair: tuple, order: Order) -> bool:
+    def is_buyer(pair: tuple, order_contract: Address) -> bool:
         contracts_alpha = sorted([str(pair[0]), str(pair[1])])
-        return order.contract() == Address.from_string(contracts_alpha[1])
+        return order_contract == Address.from_string(contracts_alpha[1])
 
     @staticmethod
     def get_pair_name(pair: tuple) -> str:

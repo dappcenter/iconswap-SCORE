@@ -28,7 +28,7 @@ from .iconswap.whitelist import *
 from .interfaces.irc2 import *
 
 
-class InvalidTokenFallbackParams(Exception):
+class InvalidCallParameters(Exception):
     pass
 
 
@@ -309,6 +309,30 @@ class ICONSwap(IconScoreBase):
         taker.set_status(OrderStatus.CANCELLED)
         self.SwapCancelledEvent(swap.id())
 
+    def _market_create_limit_irc2_order(self, _value: int, _from: Address, params: dict) -> None:
+        taker_amount = int(params['taker_amount'], 16)
+        taker_contract = Address.from_string(params['taker_contract'])
+        maker_contract = self.msg.sender
+        maker_amount = _value
+        maker_address = _from
+        self._market_create_limit_order(taker_contract, taker_amount, maker_contract, maker_amount, maker_address)
+
+    def _create_irc2_swap(self, _value: int, _from: Address, params: dict) -> None:
+        maker_contract = self.msg.sender
+        maker_amount = _value
+        maker_address = _from
+        taker_contract = Address.from_string(params['taker_contract'])
+        taker_amount = int(params['taker_amount'], 16)
+        taker_address = Address.from_string(params['taker_address']) if 'taker_address' in params else EMPTY_ORDER_PROVIDER
+        self._create_swap(maker_contract, maker_amount, taker_contract, taker_amount, maker_address, taker_address)
+
+    def _fill_irc2_order(self, _value: int, _from: Address, params: dict) -> None:
+        taker_contract = self.msg.sender
+        taker_amount = _value
+        taker_address = _from
+        swap_id = int(params['swap_id'], 16)
+        self._fill_swap(swap_id, taker_contract, taker_amount, taker_address)
+
     # ================================================
     #  Checks
     # ================================================
@@ -361,28 +385,42 @@ class ICONSwap(IconScoreBase):
                 }
         """
         if _data is None or _data == b'None':
-            raise InvalidTokenFallbackParams
+            raise InvalidCallParameters('tokenFallback', 'data')
 
         params = json_loads(_data.decode('utf-8'))
 
         if params['action'] == 'create_irc2_swap':
-            maker_contract = self.msg.sender
-            maker_amount = _value
-            maker_address = _from
-            taker_contract = Address.from_string(params['taker_contract'])
-            taker_amount = int(params['taker_amount'], 16)
-            taker_address = Address.from_string(params['taker_address']) if 'taker_address' in params else EMPTY_ORDER_PROVIDER
-            self._create_swap(maker_contract, maker_amount, taker_contract, taker_amount, maker_address, taker_address)
-
+            self._create_irc2_swap(_value, _from, params)
         elif params['action'] == 'fill_irc2_order':
-            taker_contract = self.msg.sender
-            taker_amount = _value
-            taker_address = _from
-            swap_id = int(params['swap_id'], 16)
-            self._fill_swap(swap_id, taker_contract, taker_amount, taker_address)
-
+            self._fill_irc2_order(_value, _from, params)
+        elif params['action'] == 'market_create_limit_irc2_order':
+            self._market_create_limit_irc2_order(_value, _from, params)
         else:
-            raise InvalidTokenFallbackParams
+            raise InvalidCallParameters('tokenFallback', 'action')
+
+    def _market_create_limit_order(self,
+                                   taker_contract: Address,
+                                   taker_amount: int,
+                                   maker_contract: Address,
+                                   maker_amount: int,
+                                   maker_address: Address) -> None:
+        #revert(f"{taker_contract} / {taker_amount} / {maker_contract} / {maker_amount} / {maker_address}")
+        pair = (maker_contract, taker_contract)
+        pending_swaps = MarketPendingSwapDB(pair, self.db)
+        if MarketPairsDB.is_buyer(pair, maker_contract):
+            sellers = pending_swaps.sellers()
+            for sell in sellers:
+                Logger.warning(Swap(sell, self.db).serialize(), "LISTING")
+
+    @catch_error
+    @check_maintenance
+    @external
+    @payable
+    def market_create_limit_icx_order(self, taker_contract: Address, taker_amount: int) -> None:
+        maker_address = self.msg.sender
+        maker_amount = self.msg.value
+        maker_contract = ZERO_SCORE_ADDRESS
+        self._market_create_limit_order(taker_contract, taker_amount, maker_contract, maker_amount, maker_address)
 
     @catch_error
     @check_maintenance
@@ -456,7 +494,7 @@ class ICONSwap(IconScoreBase):
             if last_swap:
                 # most recent swap
                 orders = last_swap.get_orders()
-                if MarketPairsDB.is_buyer(pair_tuple, orders[0]):
+                if MarketPairsDB.is_buyer(pair_tuple, orders[0].contract()):
                     pair['last_price'] = last_swap.get_inverted_price()
                 else:
                     pair['last_price'] = last_swap.get_price()
