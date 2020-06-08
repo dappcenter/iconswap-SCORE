@@ -21,6 +21,10 @@ from ..scorelib.linked_list import *
 from ..scorelib.set import *
 
 
+class InvalidMarketPair(Exception):
+    pass
+
+
 class _MarketSidePendingSwapDB(UIDLinkedListDB):
     """ _MarketSidePendingSwapDB is a linked list of swaps
         sorted by a given "compare" function
@@ -79,7 +83,7 @@ class _MarketSellersPendingSwapDB(_MarketSidePendingSwapDB):
     def compare(self, new_swap_id: int, cur_swap_id: int) -> bool:
         new_swap_price = Swap(new_swap_id, self._db).get_inverted_price()
         cur_swap_price = Swap(cur_swap_id, self._db).get_inverted_price()
-        return new_swap_price > cur_swap_price
+        return new_swap_price < cur_swap_price
 
     def add(self, new_swap_id: int) -> None:
         super().add(new_swap_id, self.compare)
@@ -138,6 +142,22 @@ class MarketFilledSwapDB(UIDLinkedListDB):
 class MarketPairsDB(SetDB):
     _NAME = 'MARKET_PAIRS_DB'
 
+    def __init__(self, db: IconScoreDatabase):
+        name = MarketPairsDB._NAME
+        super().__init__(name, db, str)
+        self._name = name
+
+    @staticmethod
+    def check_valid_pair(pair: tuple) -> None:
+        if len(pair) != 2:
+            raise InvalidMarketPair(pair)
+        try:
+            # Check if valid Address
+            Address.from_string(pair[0])
+            Address.from_string(pair[1])
+        except:
+            raise InvalidMarketPair(pair)
+
     @staticmethod
     def is_buyer(pair: tuple, order: Order) -> bool:
         contracts_alpha = sorted([str(pair[0]), str(pair[1])])
@@ -147,11 +167,6 @@ class MarketPairsDB(SetDB):
     def get_pair_name(pair: tuple) -> str:
         contracts_alpha = sorted([str(pair[0]), str(pair[1])])
         return contracts_alpha[0] + '/' + contracts_alpha[1]
-
-    def __init__(self, db: IconScoreDatabase):
-        name = MarketPairsDB._NAME
-        super().__init__(name, db, str)
-        self._name = name
 
     def add(self, pair: tuple) -> None:
         super().add(MarketPairsDB.get_pair_name(pair))

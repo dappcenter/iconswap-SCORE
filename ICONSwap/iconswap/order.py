@@ -149,7 +149,7 @@ class Order(object):
             'provider': str(self._provider.get())
         }
 
-    def __delete__(self) -> None:
+    def delete(self) -> None:
         self._contract.remove()
         self._amount.remove()
         self._status.remove()

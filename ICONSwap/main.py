@@ -64,6 +64,10 @@ class ICONSwap(IconScoreBase):
     def OrderRefundedEvent(self, order_id: int) -> None:
         pass
 
+    @eventlog
+    def ShowException(self, exception: str):
+        pass
+
     # ================================================
     #  Initialization
     # ================================================
@@ -83,6 +87,9 @@ class ICONSwap(IconScoreBase):
         if version.is_less_than_target_version('0.4.0'):
             self._migrate_v0_4_0()
 
+        if version.is_less_than_target_version('0.4.1'):
+            self._migrate_v0_4_1()
+
         version.update(VERSION)
 
     # ================================================
@@ -96,9 +103,23 @@ class ICONSwap(IconScoreBase):
             if taker.provider() == None and taker.status() in [OrderStatus.EMPTY, OrderStatus.CANCELLED]:
                 taker._provider.set(EMPTY_ORDER_PROVIDER)
 
-    # ================================================
-    #  Internal methods
-    # ================================================
+    def _migrate_v0_4_1(self) -> None:
+        # Market sellers should be reversed for all markets
+        for pair in MarketPairsDB(self.db):
+            pair = pair.split('/')
+            # Get the list of selling pending swaps
+            pendings = list(MarketPendingSwapDB(pair, self.db).sellers())
+
+            # Clear the DB
+            MarketPendingSwapDB(pair, self.db).sellers().clear()
+
+            # Add them again to the DB in the correct order
+            for old_swap in pendings:
+                MarketPendingSwapDB(pair, self.db).add(old_swap)
+
+        # ================================================
+        #  Internal methods
+        # ================================================
     def _transfer_order(self, order: Order, dest: Address) -> None:
         if self._is_icx(order):
             self.icx.transfer(dest, order.amount())
@@ -106,8 +127,8 @@ class ICONSwap(IconScoreBase):
             irc2 = self.create_interface_score(order.contract(), IRC2Interface)
             irc2.transfer(dest, order.amount())
 
-    def _get_market_last_filled_swap(self, pair: str) -> Swap:
-        filled_swaps = MarketFilledSwapDB(tuple(pair.split('/')), self.db).select(0)
+    def _get_market_last_filled_swap(self, pair: tuple) -> Swap:
+        filled_swaps = MarketFilledSwapDB(pair, self.db).select(0)
         if filled_swaps:
             return Swap(filled_swaps[0], self.db)
 
@@ -421,7 +442,7 @@ class ICONSwap(IconScoreBase):
         for pair in pairs:
             pair_tuple = tuple(pair['name'].split('/'))
             pair['swaps_pending_count'] = len(MarketPendingSwapDB(pair_tuple, self.db))
-            last_swap = self._get_market_last_filled_swap(pair['name'])
+            last_swap = self._get_market_last_filled_swap(pair_tuple)
             if last_swap:
                 # most recent swap
                 orders = last_swap.get_orders()
@@ -440,7 +461,9 @@ class ICONSwap(IconScoreBase):
     @catch_error
     @external(readonly=True)
     def get_market_buyers_pending_swaps(self, pair: str, offset: int) -> list:
-        pending_swaps = MarketPendingSwapDB(tuple(pair.split('/')), self.db)
+        pair = tuple(pair.split('/'))
+        MarketPairsDB.check_valid_pair(pair)
+        pending_swaps = MarketPendingSwapDB(pair, self.db)
         return [
             Swap(swap_id, self.db).serialize()
             for swap_id in pending_swaps.buyers().select(offset)
@@ -449,7 +472,9 @@ class ICONSwap(IconScoreBase):
     @catch_error
     @external(readonly=True)
     def get_market_sellers_pending_swaps(self, pair: str, offset: int) -> list:
-        pending_swaps = MarketPendingSwapDB(tuple(pair.split('/')), self.db)
+        pair = tuple(pair.split('/'))
+        MarketPairsDB.check_valid_pair(pair)
+        pending_swaps = MarketPendingSwapDB(pair, self.db)
         return [
             Swap(swap_id, self.db).serialize()
             for swap_id in pending_swaps.sellers().select(offset)
@@ -458,13 +483,17 @@ class ICONSwap(IconScoreBase):
     @catch_error
     @external(readonly=True)
     def get_market_last_filled_swap(self, pair: str) -> dict:
+        pair = tuple(pair.split('/'))
+        MarketPairsDB.check_valid_pair(pair)
         last_swap = self._get_market_last_filled_swap(pair)
         return last_swap.serialize() if last_swap else {}
 
     @catch_error
     @external(readonly=True)
     def get_market_filled_swaps(self, pair: str, offset: int) -> list:
-        filled_swaps = MarketFilledSwapDB(tuple(pair.split('/')), self.db)
+        pair = tuple(pair.split('/'))
+        MarketPairsDB.check_valid_pair(pair)
+        filled_swaps = MarketFilledSwapDB(pair, self.db)
         return [
             Swap(swap_id, self.db).serialize()
             for swap_id in filled_swaps.select(offset)
@@ -491,7 +520,9 @@ class ICONSwap(IconScoreBase):
     @catch_error
     @external(readonly=True)
     def get_account_pair_pending_swaps(self, address: Address, pair: str, offset: int) -> list:
-        pending_swaps = AccountPairPendingSwapDB(address, tuple(pair.split('/')), self.db)
+        pair = tuple(pair.split('/'))
+        MarketPairsDB.check_valid_pair(pair)
+        pending_swaps = AccountPairPendingSwapDB(address, pair, self.db)
         return [
             Swap(swap_id, self.db).serialize()
             for swap_id in pending_swaps.select(offset)
@@ -500,7 +531,9 @@ class ICONSwap(IconScoreBase):
     @catch_error
     @external(readonly=True)
     def get_account_pair_filled_swaps(self, address: Address, pair: str, offset: int) -> list:
-        filled_swaps = AccountPairFilledSwapDB(address, tuple(pair.split('/')), self.db)
+        pair = tuple(pair.split('/'))
+        MarketPairsDB.check_valid_pair(pair)
+        filled_swaps = AccountPairFilledSwapDB(address, pair, self.db)
         return [
             Swap(swap_id, self.db).serialize()
             for swap_id in filled_swaps.select(offset)
@@ -531,7 +564,7 @@ class ICONSwap(IconScoreBase):
 
     @catch_error
     @external(readonly=True)
-    def get_version(self) -> str:
+    def version(self) -> str:
         return Version(self.db).get()
 
     @external(readonly=True)
