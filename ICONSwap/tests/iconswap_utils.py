@@ -227,3 +227,13 @@ class ICONSwapTests(IconIntegrateTestBase):
 
     def _fill_icx_order_error(self, _from, swap_id, amount):
         return self._fill_icx_order(transaction_call_error, _from, swap_id, amount)
+
+    def _get_market_info(self, offset: int):
+        return icx_call(
+            super(),
+            from_=self._operator.get_address(),
+            to_=self._score_address,
+            method="get_market_info",
+            params={"offset": offset},
+            icon_service=self.icon_service
+        )
