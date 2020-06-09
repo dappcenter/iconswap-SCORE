@@ -34,7 +34,7 @@ class Version(object):
         self._db = db
 
     @staticmethod
-    def _as_tuple(version: str):
+    def _as_tuple(version: str) -> tuple:
         parts = []
         for part in version.split('.'):
             parts.append(int(part))

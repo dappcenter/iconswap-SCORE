@@ -237,3 +237,13 @@ class ICONSwapTests(IconIntegrateTestBase):
             params={"swap_id": swap_id},
             icon_service=self.icon_service
         )
+
+    def _get_market_info(self, offset: int):
+        return icx_call(
+            super(),
+            from_=self._operator.get_address(),
+            to_=self._score_address,
+            method="get_market_info",
+            params={"offset": offset},
+            icon_service=self.icon_service
+        )
