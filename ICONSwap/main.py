@@ -421,13 +421,64 @@ class ICONSwap(IconScoreBase):
                                    maker_contract: Address,
                                    maker_amount: int,
                                    maker_address: Address) -> None:
-        #revert(f"{taker_contract} / {taker_amount} / {maker_contract} / {maker_amount} / {maker_address}")
+        # revert(f"{taker_contract} / {taker_amount} / {maker_contract} / {maker_amount} / {maker_address}")
         pair = (maker_contract, taker_contract)
         pending_swaps = MarketPendingSwapDB(pair, self.db)
+
         if MarketPairsDB.is_buyer(pair, maker_contract):
-            sellers = pending_swaps.sellers()
-            for sell in sellers:
-                Logger.warning(Swap(sell, self.db).serialize(), "LISTING")
+            remaining_amount = taker_amount
+
+            limit_price = maker_amount / taker_amount
+            Logger.warning(f"limit price = {limit_price}")
+
+            # Convert the linked list as we're going it during iteration
+            sellers = list(pending_swaps.sellers())
+
+            # Browse the order book and fill as much swaps as possible,
+            # begginning with the cheapest swaps first, until:
+            #   1) there is no more user funds left, or
+            #   2) the user swap price is reached, or
+            #   3) the end of the order book is reached
+            for swap_id in sellers:
+                Logger.warning(f"REMAINING={remaining_amount}")
+                Logger.warning(f"taker_amount ={int(remaining_amount * limit_price)}")
+                swap = Swap(swap_id, self.db)
+
+                Logger.warning(Swap(swap_id, self.db).serialize(), "LISTING")
+                Logger.warning(f"Cur Price : {swap.get_inverted_price()} | Limit : {limit_price} | Higher : {swap.get_inverted_price() > limit_price}")
+
+                maker, taker = swap.get_orders()
+
+                if remaining_amount <= 0:
+                    Logger.warning("STOP COND 1")
+                    # 1) All funds have been spent on lower price swaps, stop
+                    break
+
+                if round(swap.get_inverted_price(), 4) > round(limit_price, 4):
+                    Logger.warning("STOP COND 2")
+                    # 2) User swap price is reached
+                    # Create a new swap at this price and stop
+                    # Deduce taker_amount from user price and remaining amount
+                    taker_amount = int(remaining_amount * limit_price)
+                    Logger.warning(f"maker_contract ={maker_contract}")
+                    Logger.warning(f"taker_amount ={taker_amount}")
+                    Logger.warning(f"taker_contract ={taker_contract}")
+                    Logger.warning(f"remaining_amount ={remaining_amount}")
+                    Logger.warning(f"maker_address ={maker_address}")
+                    self._create_swap(maker_contract, taker_amount, taker_contract, remaining_amount, maker_address, EMPTY_ORDER_PROVIDER)
+                    break
+
+                # Fill the swap
+                self._fill_swap(swap_id, maker_contract, taker.amount(), EMPTY_ORDER_PROVIDER)
+                remaining_amount -= maker.amount()
+            else:
+                Logger.warning("STOP COND 3")
+                # 3) End of the order book
+                # Deduce taker_amount from user price and remaining amount
+                taker_amount = int(remaining_amount * limit_price)
+                self._create_swap(maker_contract, taker_amount, taker_contract, remaining_amount, maker_address, EMPTY_ORDER_PROVIDER)
+
+        Logger.warning("STOP")
 
     @catch_error
     @check_maintenance
