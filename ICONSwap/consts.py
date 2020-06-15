@@ -21,5 +21,6 @@ from iconservice import *
 #  Consts
 # ================================================
 TAG = 'ICONSwap'
-VERSION = '0.4.1'
+VERSION = '0.4.2'
 ZERO_SCORE_ADDRESS = Address.from_string('cx0000000000000000000000000000000000000000')
+ICONBET_WAGES_ADDRESS = Address.from_string('cx75e584ffe40cf361b3daa00fa6593198d47505d5')

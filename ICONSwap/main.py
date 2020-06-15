@@ -73,11 +73,13 @@ class ICONSwap(IconScoreBase):
     # ================================================
     def __init__(self, db: IconScoreDatabase) -> None:
         super().__init__(db)
+        self._iconbet_wages = VarDB(f'{ICONSwap._NAME}_ICONBET_WAGES', db, value_type=Address)
 
     def on_install(self) -> None:
         super().on_install()
         SCOREMaintenance(self.db).disable()
         Version(self.db).update(VERSION)
+        self._iconbet_wages.set(ICONBET_WAGES_ADDRESS)
 
     def on_update(self) -> None:
         super().on_update()
@@ -89,6 +91,9 @@ class ICONSwap(IconScoreBase):
 
         if version.is_less_than_target_version('0.4.1'):
             self._migrate_v0_4_1()
+
+        if version.is_less_than_target_version('0.4.2'):
+            self._migrate_v0_4_2()
 
         version.update(VERSION)
 
@@ -116,6 +121,9 @@ class ICONSwap(IconScoreBase):
             # Add them again to the DB in the correct order
             for old_swap in pendings:
                 MarketPendingSwapDB(pair, self.db).add(old_swap)
+
+    def _migrate_v0_4_2(self) -> None:
+        self._iconbet_wages.set(ICONBET_WAGES_ADDRESS)
 
         # ================================================
         #  Internal methods
@@ -320,7 +328,15 @@ class ICONSwap(IconScoreBase):
     # ================================================
     @payable
     def fallback(self):
-        revert("ICONSwap contract doesn't accept direct ICX transfers")
+        src = self.msg.sender
+        amount = self.msg.value
+
+        # Redirect ICX from TAP holding to operator
+        if (self.msg.sender == self._iconbet_wages.get()):
+            self.icx.transfer(self.owner, amount)
+        else:
+            # Refund without revert in order to prevent caller's SCORE fail
+            self.icx.transfer(src, amount)
 
     @catch_error
     @check_maintenance
@@ -603,3 +619,9 @@ class ICONSwap(IconScoreBase):
             SCOREMaintenance(self.db).enable()
         elif mode == SCOREMaintenanceMode.DISABLED:
             SCOREMaintenance(self.db).disable()
+
+    @catch_error
+    @external
+    @only_owner
+    def set_iconbet_wages(self, address: Address) -> None:
+        self._iconbet_wages.set(address)
