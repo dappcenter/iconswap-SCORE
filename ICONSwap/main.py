@@ -398,6 +398,121 @@ class ICONSwap(IconScoreBase):
         swap_id = int(params['swap_id'], 16)
         self._fill_swap(swap_id, taker_contract, taker_amount, taker_address)
 
+    def _cleanup_decimals_ex(self, contract: Address, amount: int) -> tuple:
+
+        decimals = ICX_TOKEN_DECIMALS if self._is_contract_icx(contract) \
+            else self.create_interface_score(contract, IRC2Interface).decimals()
+
+        divisor = 10**(decimals - SWAP_MAX_DECIMALS)
+        rounded_amount = amount // divisor
+        float_amount = amount / divisor
+
+        if rounded_amount != float_amount:
+            exceeded = amount - (rounded_amount * divisor)
+            amount -= exceeded
+            return (amount, exceeded)
+
+        return (amount, 0)
+
+    def _cleanup_decimals(self,
+                          maker_contract: Address,
+                          maker_amount: int,
+                          taker_contract: Address,
+                          taker_amount: int,
+                          maker_address: Address) -> tuple:
+
+        maker_amount, maker_exceed = self._cleanup_decimals_ex(maker_contract, maker_amount)
+        taker_amount, taker_exceed = self._cleanup_decimals_ex(taker_contract, taker_amount)
+
+        # Refund maker if exceed
+        if maker_exceed > 0:
+            # Send back the exceed decimals to the maker
+            self._transfer_funds(maker_contract, maker_exceed, maker_address)
+
+        return (maker_amount, taker_amount)
+
+    def _market_create_limit_order(self,
+                                   taker_contract: Address,
+                                   taker_amount: int,
+                                   maker_contract: Address,
+                                   maker_amount: int,
+                                   maker_address: Address) -> None:
+
+        maker_amount, taker_amount = self._cleanup_decimals(maker_contract, maker_amount, taker_contract, taker_amount, maker_address)
+
+        pair = (maker_contract, taker_contract)
+        pending_swaps = MarketPendingSwapDB(pair, self.db)
+
+        # Convert the linked list as we're going it during iteration
+        if MarketPairsDB.is_buyer(pair, maker_contract):
+            swaps = list(pending_swaps.sellers())
+            limit_price = maker_amount / taker_amount
+
+            def taker_price_fn(remaining: int, limit_price: float) -> int:
+                return int(remaining // limit_price)
+
+            def swap_price_fn(swap: Swap) -> float:
+                return swap.get_inverted_price()
+
+            def limit_fn(swap_price: int, limit_price: float) -> bool:
+                return round(swap_price, SWAP_MAX_DECIMALS) > round(limit_price, SWAP_MAX_DECIMALS)
+
+        else:
+            swaps = list(pending_swaps.buyers())
+            limit_price = taker_amount / maker_amount
+
+            def taker_price_fn(remaining: int, limit_price: float) -> int:
+                return int(remaining * limit_price)
+
+            def swap_price_fn(swap: Swap) -> float:
+                return swap.get_price()
+
+            def limit_fn(swap_price: int, limit_price: float) -> bool:
+                return round(swap_price, SWAP_MAX_DECIMALS) < round(limit_price, SWAP_MAX_DECIMALS)
+
+        # Browse the order book and fill as much swaps as possible,
+        # begginning with the cheapest swaps first, until:
+        #   1) there is no more user funds left, or
+        #   2) the user limit price is reached, or
+        #   3) the end of the order book is reached
+        remaining = maker_amount
+        for swap_id in swaps:
+            swap = Swap(swap_id, self.db)
+            maker, taker = swap.get_orders()
+            swap_price = swap_price_fn(swap)
+
+            if remaining <= 0:
+                # 1) All funds have been spent on lower price swaps, stop
+                # Logger.warning(f"STOP COND 1 (remaining: {remaining})")
+                break
+
+            if limit_fn(swap_price, limit_price):
+                # Logger.warning(f"STOP COND 2 (limit price reached : Sw:{round(swap_price, 7)} / Lim:{round(limit_price, 7)})")
+                # 2) User limit price is reached
+                # Create a new swap at this price and stop
+                taker_amount = taker_price_fn(remaining, limit_price)
+                remaining, maker_exceed = self._cleanup_decimals_ex(maker_contract, remaining)
+                taker_amount, taker_exceed = self._cleanup_decimals_ex(taker_contract, taker_amount)
+                # Logger.warning(f"------ \n Creating Swap : \n - {remaining / 10**ICX_TOKEN_DECIMALS} {maker_contract} for \n - {taker_amount / 10**ICX_TOKEN_DECIMALS} {taker_contract} \n - (P={limit_price})\n")
+                self._transfer_funds(maker_contract, maker_exceed, maker_address)
+                self._create_swap(maker_contract, remaining, taker_contract, taker_amount, maker_address, EMPTY_ORDER_PROVIDER)
+                break
+
+            filling = min(taker.amount(), remaining)
+            # Logger.warning(f"------ \n Filling Swap : \n - {filling / 10**ICX_TOKEN_DECIMALS} {maker_contract} for \n - {maker.amount() / 10**ICX_TOKEN_DECIMALS} {taker_contract} \n - (P={swap_price})\n")
+            remaining -= taker.amount()
+            self._fill_swap(swap_id, maker_contract, filling, EMPTY_ORDER_PROVIDER)
+
+        else:
+            # 3) End of the order book
+            # Logger.warning(f"STOP COND 3 (end of order book) (remaining={remaining})")
+            taker_amount = taker_price_fn(remaining, limit_price)
+            remaining, maker_exceed = self._cleanup_decimals_ex(maker_contract, remaining)
+            taker_amount, taker_exceed = self._cleanup_decimals_ex(taker_contract, taker_amount)
+            # Logger.warning(f"------ \n Creating Swap : \n - {remaining / 10**ICX_TOKEN_DECIMALS} {maker_contract} for \n - {taker_amount / 10**ICX_TOKEN_DECIMALS} {taker_contract} \n - (P={limit_price})\n")
+            self._transfer_funds(maker_contract, maker_exceed, maker_address)
+            self._create_swap(maker_contract, remaining, taker_contract, taker_amount, maker_address, EMPTY_ORDER_PROVIDER)
+
     # ================================================
     #  Checks
     # ================================================
@@ -470,145 +585,6 @@ class ICONSwap(IconScoreBase):
             self._market_create_limit_irc2_order(_value, _from, params)
         else:
             raise InvalidCallParameters('tokenFallback', 'action')
-
-    def _cleanup_decimals_ex(self, contract: Address, amount: int) -> tuple:
-
-        decimals = ICX_TOKEN_DECIMALS if self._is_contract_icx(contract) \
-            else self.create_interface_score(contract, IRC2Interface).decimals()
-
-        divisor = 10**(decimals - SWAP_MAX_DECIMALS)
-        rounded_amount = amount // divisor
-        float_amount = amount / divisor
-
-        if rounded_amount != float_amount:
-            exceeded = amount - (rounded_amount * divisor)
-            amount -= exceeded
-            return (amount, exceeded)
-
-        return (amount, 0)
-
-    def _cleanup_decimals(self,
-                          maker_contract: Address,
-                          maker_amount: int,
-                          taker_contract: Address,
-                          taker_amount: int,
-                          maker_address: Address) -> tuple:
-
-        maker_amount, maker_exceed = self._cleanup_decimals_ex(maker_contract, maker_amount)
-        taker_amount, taker_exceed = self._cleanup_decimals_ex(taker_contract, taker_amount)
-
-        # Refund maker if exceed
-        if maker_exceed > 0:
-            Logger.warning(f"Maker exceed {maker_exceed} {maker_contract}")
-            # Send back the exceed decimals to the maker
-            self._transfer_funds(maker_contract, maker_exceed, maker_address)
-
-        return (maker_amount, taker_amount)
-
-    def _market_create_limit_order(self,
-                                   taker_contract: Address,
-                                   taker_amount: int,
-                                   maker_contract: Address,
-                                   maker_amount: int,
-                                   maker_address: Address) -> None:
-
-        Logger.warning(f"===============================================================================")
-        Logger.warning(f""" BEFORE :
-            taker_contract={taker_contract}
-            taker_amount={taker_amount}
-            maker_contract={maker_contract}
-            maker_amount={maker_amount}
-            maker_address={maker_address}
-        """)
-        Logger.warning(f"===============================================================================")
-
-        maker_amount, taker_amount = self._cleanup_decimals(maker_contract, maker_amount, taker_contract, taker_amount, maker_address)
-        Logger.warning(f"===============================================================================")
-        Logger.warning(f""" AFTER :
-            taker_amount={taker_amount}
-            maker_amount={maker_amount}
-        """)
-        Logger.warning(f"===============================================================================")
-
-        pair = (maker_contract, taker_contract)
-        pending_swaps = MarketPendingSwapDB(pair, self.db)
-
-        # Convert the linked list as we're going it during iteration
-        if MarketPairsDB.is_buyer(pair, maker_contract):
-            Logger.warning("Buy Side")
-            swaps = list(pending_swaps.sellers())
-            limit_price = maker_amount / taker_amount
-
-            def taker_price_fn(remaining: int, limit_price: float) -> int:
-                return int(remaining // limit_price)
-
-            def swap_price_fn(swap: Swap) -> float:
-                return swap.get_inverted_price()
-
-            def limit_fn(swap_price: int, limit_price: float) -> bool:
-                return round(swap_price, SWAP_MAX_DECIMALS) > round(limit_price, SWAP_MAX_DECIMALS)
-
-        else:
-            Logger.warning("Sell Side")
-            swaps = list(pending_swaps.buyers())
-            limit_price = taker_amount / maker_amount
-
-            def taker_price_fn(remaining: int, limit_price: float) -> int:
-                return int(remaining * limit_price)
-
-            def swap_price_fn(swap: Swap) -> float:
-                return swap.get_price()
-
-            def limit_fn(swap_price: int, limit_price: float) -> bool:
-                return round(swap_price, SWAP_MAX_DECIMALS) < round(limit_price, SWAP_MAX_DECIMALS)
-
-        # Browse the order book and fill as much swaps as possible,
-        # begginning with the cheapest swaps first, until:
-        #   1) there is no more user funds left, or
-        #   2) the user limit price is reached, or
-        #   3) the end of the order book is reached
-        remaining = maker_amount
-        for swap_id in swaps:
-            swap = Swap(swap_id, self.db)
-            maker, taker = swap.get_orders()
-            swap_price = swap_price_fn(swap)
-            Logger.warning(f"swap_price ={swap_price}")
-            Logger.warning(f"limit_price={limit_price}")
-            Logger.warning(f"CURSWAP={swap.serialize()}")
-
-            if remaining <= 0:
-                # 1) All funds have been spent on lower price swaps, stop
-                Logger.warning(f"STOP COND 1 (remaining: {remaining})")
-                break
-
-            if limit_fn(swap_price, limit_price):
-                Logger.warning(f"STOP COND 2 (limit price reached : Sw:{round(swap_price, 7)} / Lim:{round(limit_price, 7)})")
-                # 2) User limit price is reached
-                # Create a new swap at this price and stop
-                taker_amount = taker_price_fn(remaining, limit_price)
-                remaining, maker_exceed = self._cleanup_decimals_ex(maker_contract, remaining)
-                taker_amount, taker_exceed = self._cleanup_decimals_ex(taker_contract, taker_amount)
-                Logger.warning(f"------ \n Creating Swap : \n - {remaining / 10**ICX_TOKEN_DECIMALS} {maker_contract} for \n - {taker_amount / 10**ICX_TOKEN_DECIMALS} {taker_contract} \n - (P={limit_price})\n")
-                self._transfer_funds(maker_contract, maker_exceed, maker_address)
-                self._create_swap(maker_contract, remaining, taker_contract, taker_amount, maker_address, EMPTY_ORDER_PROVIDER)
-                break
-
-            filling = min(taker.amount(), remaining)
-            Logger.warning(f"------ \n Filling Swap : \n - {filling / 10**ICX_TOKEN_DECIMALS} {maker_contract} for \n - {maker.amount() / 10**ICX_TOKEN_DECIMALS} {taker_contract} \n - (P={swap_price})\n")
-            remaining -= taker.amount()
-            self._fill_swap(swap_id, maker_contract, filling, EMPTY_ORDER_PROVIDER)
-
-        else:
-            # 3) End of the order book
-            Logger.warning(f"STOP COND 3 (end of order book) (remaining={remaining})")
-            taker_amount = taker_price_fn(remaining, limit_price)
-            remaining, maker_exceed = self._cleanup_decimals_ex(maker_contract, remaining)
-            taker_amount, taker_exceed = self._cleanup_decimals_ex(taker_contract, taker_amount)
-            Logger.warning(f"------ \n Creating Swap : \n - {remaining / 10**ICX_TOKEN_DECIMALS} {maker_contract} for \n - {taker_amount / 10**ICX_TOKEN_DECIMALS} {taker_contract} \n - (P={limit_price})\n")
-            self._transfer_funds(maker_contract, maker_exceed, maker_address)
-            self._create_swap(maker_contract, remaining, taker_contract, taker_amount, maker_address, EMPTY_ORDER_PROVIDER)
-
-        Logger.warning("STOP")
 
     @catch_error
     @check_maintenance
